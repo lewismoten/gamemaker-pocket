@@ -2,6 +2,13 @@
 
 The firmware has no release number of its own. Every build bakes in its git hash and date (`fwid.py`), and the serial command `FW` prints them (`FW board=C git=1a2b3c4 date=2026-11-09 env=cyd-2432s028`). This changelog starts at 0.1.0, the first version of this repository.
 
+## Unreleased
+
+### Added
+
+- Games can be kept in the board's flash (LittleFS `/games`) and play like card games, marked On board; a card copy wins over a board copy.
+- The web flasher's "Player + starter games" install (Virus Blaster, Snowbound, KEEP IT BRIEF!, Sandcastle Knight, Where's the Remote?!), now its default.
+
 ## 0.1.0 - 2026-11-09
 
 ### Added

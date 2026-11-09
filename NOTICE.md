@@ -8,6 +8,7 @@ This repository was split from [Game-Maker: Sandbox Edition](https://github.com/
 
 - `src/gmcore.h`, `src/gmmon.h`: a port of the web engine of Game-Maker: Sandbox Edition (`web/packages/engine`, MIT), which follows `PLAYGAME.C` from **RSD Game-Maker 3.0** (Recreational Software Designs, 1991-1995; the source was released under the MIT License in 2014 by gandrewstone, github.com/gandrewstone/GameMaker). `gmmon.h` ports the engine's `monsters.ts`. The tune timing in `src/pcspeaker.h` (36 steps of 1/145.6 s) follows `code/GM/PLAYGAME.C` and the web engine.
 - `data/`: the Starter games' own maps, blocks, palettes and hero files, packed by Game-Maker: Sandbox Edition (`web/scripts/pocketData.ts`), MIT as above. `data/library.jsonl` and the thumbnails come from the same packer. The games keep their own credits (their `LICENSE.TXT` files are in that repository).
+- The "Player + starter games" install image (`docs/fw/*/littlefs-games.bin`) carries five whole games from Game-Maker: Sandbox Edition (Virus Blaster, Snowbound, KEEP IT BRIEF!, Sandcastle Knight, Where's the Remote?!), exported as `.GMP` files by its `web/scripts/pocketData.ts`: MIT as above, with that project's credits for their art, music and voices.
 
 ## Third-party code and data
 
