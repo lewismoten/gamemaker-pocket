@@ -24,11 +24,12 @@ int main(int argc,char**argv) {
   assert(pk::crc32("123456789",9)==0xcbf43926);
   {  // Games kept in the board's flash: listed by name like the card's, marked, and the card's copy wins over the board's.
     assert(pk::gmpName("VIRUS.GMP")&&pk::gmpName("a-b_c1.gmp")&&!pk::gmpName(".GMP")&&!pk::gmpName("a b.GMP")&&!pk::gmpName("WAYTOOLONGNAME1.GMP")&&!pk::gmpName("GAME.ZIP"));
-    pk::Entry board={},card={};board.one=true;card.one=card.sd=true;
+    pk::Entry board={},card={};board.one=true;card.one=card.sd=true;strcpy(board.id,"b");strcpy(card.id,"c");
     assert(pk::onBoard(board)&&!pk::onBoard(card));
     assert(pk::sdBeatsBoard(card,board)&&!pk::sdBeatsBoard(board,card)&&!pk::sdBeatsBoard(card,card)&&!pk::sdBeatsBoard(board,board));
     strcpy(board.file,"BLASTER.GMP");strcpy(card.file,"blaster.gmp");board.uid[0]=1;card.uid[0]=2;assert(pk::sdBeatsBoard(card,board));  // same name, any case, even with different ids
-    strcpy(card.file,"OTHER.GMP");assert(!pk::sdBeatsBoard(card,board));strcpy(board.id,"blaster");strcpy(card.id,"blaster");assert(pk::sdBeatsBoard(card,board));strcpy(card.id,"other");card.uid[0]=1;assert(pk::sdBeatsBoard(card,board));  // or the same uid
+    strcpy(card.file,"OTHER.GMP");assert(!pk::sdBeatsBoard(card,board));strcpy(board.id,"blaster");strcpy(card.id,"blaster");assert(pk::sdBeatsBoard(card,board));strcpy(card.id,"c");pk::Entry loose={};loose.sd=true;strcpy(loose.id,board.id);loose.uid[0]=9;assert(pk::sdBeatsBoard(loose,board));  // a loose card folder game too
+card.uid[0]=1;assert(pk::sdBeatsBoard(card,board));  // or the same uid
     card.uid[0]=2;strcpy(card.file,"blaster.gmp");
     pk::Entry starter={};assert(!pk::onBoard(starter)&&!pk::sdBeatsBoard(card,starter));  // a Starter is not an on-board one-file game
     static Phys fb;fb.W=320;fb.H=240;fb.clear();pk::clearTiles(fb,320);for(int i=0;i<2;i++)pk::thumbnail(fb,320,i,nullptr,"VIRUS BLASTER",false,false,false,nullptr,0,false,i==0);

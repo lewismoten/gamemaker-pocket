@@ -31,7 +31,7 @@ inline bool gmpName(const char* nm) {
 }
 // The card's copy of a game replaces the board's: the same file name (any case), the same game id or the same uid.
 inline bool sdBeatsBoard(const Entry& incoming,const Entry& kept) {
-  return incoming.sd&&incoming.one&&onBoard(kept)&&(!strcasecmp(incoming.file,kept.file)||!strcmp(incoming.id,kept.id)||!memcmp(incoming.uid,kept.uid,16));
+  return incoming.sd&&onBoard(kept)&&(!strcasecmp(incoming.file,kept.file)||(incoming.id[0]&&!strcmp(incoming.id,kept.id))||!memcmp(incoming.uid,kept.uid,16));
 }
 struct Cached { Entry game; uint32_t size, modified, checksum; };
 inline bool cached(const Cached&r,uint32_t size,uint32_t modified,const char*name) {
