@@ -29,8 +29,10 @@ inline bool gmpName(const char* nm) {
   for(size_t i=0;i<len-4;i++)if(!((nm[i]>='a'&&nm[i]<='z')||(nm[i]>='A'&&nm[i]<='Z')||(nm[i]>='0'&&nm[i]<='9')||nm[i]=='_'||nm[i]=='-'))return false;
   return true;
 }
-// Two entries are one game (same uid): the microSD copy wins over the board's.
-inline bool sdBeatsBoard(const Entry& incoming,const Entry& kept) {return incoming.sd&&incoming.one&&onBoard(kept);}
+// The card's copy of a game replaces the board's: the same file name (any case) or the same uid.
+inline bool sdBeatsBoard(const Entry& incoming,const Entry& kept) {
+  return incoming.sd&&incoming.one&&onBoard(kept)&&(!strcasecmp(incoming.file,kept.file)||!memcmp(incoming.uid,kept.uid,16));
+}
 struct Cached { Entry game; uint32_t size, modified, checksum; };
 inline bool cached(const Cached&r,uint32_t size,uint32_t modified,const char*name) {
   return r.checksum==crc32(&r,offsetof(Cached,checksum))&&r.game.file[15]==0&&r.game.id[27]==0&&r.game.category<=6&&r.size==size&&r.modified==modified&&r.game.one&&r.game.sd&&!strcmp(r.game.file,name);

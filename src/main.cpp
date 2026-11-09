@@ -395,8 +395,8 @@ static bool field(const char* s, const char* name, char* out, size_t cap) {
 static void identify(GameEntry& g,const char* uid) { uint8_t hash[32];mbedtls_sha256_ret((const unsigned char*)uid,strlen(uid),hash,0);memcpy(g.uid,hash,16); }
 static bool gameMeta(const GameEntry&g,pk::Meta&m);
 static bool duplicate(const GameEntry& g) {
+  for(int i=0;i<ngames;i++)if(pk::sdBeatsBoard(g,games[i])){games[i]=g;return true;}  // the same game on the card and on the board: the card's copy is the one listed
   for(int i=0;i<ngames;i++)if(!memcmp(games[i].uid,g.uid,16)) {
-    if(pk::sdBeatsBoard(g,games[i])){games[i]=g;return true;}  // the same game on the card and on the board: the card's copy is the one listed
     if(g.metadata&&games[i].metadata){pk::Meta a,b;if(gameMeta(g,a)&&gameMeta(games[i],b)&&(strcmp(a.uid,b.uid)||strcmp(a.crc,b.crc))){uidConflict=true;Serial.println("LIB conflicting UID: first installed copy retained");}}
     return true;
   }
