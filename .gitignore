@@ -1,1 +1,13 @@
+# PlatformIO
 .pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+.cache/
+compile_commands.json
+# Host test builds and Python
+a.out
+*.dSYM/
+__pycache__/
+*.pyc
+.DS_Store

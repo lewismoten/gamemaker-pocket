@@ -1,8 +1,10 @@
+> **Firmware reference.** This is the long design and field notes file, moved here from Game-Maker: Sandbox Edition with the code. Paths are relative to this repository. Commands that start `npx vite-node scripts/pocket...` or mention `web/` run in a [Game-Maker: Sandbox Edition](https://github.com/lewismoten/GameMaker-SandboxEdition) checkout (from its `web/` folder), which makes the game packs and the library; see the [README](../README.md#getting-games-onto-it).
+
 # Pocket Player
 
 Firmware for two boards: the ESP32-3248S035 (3.5 inch, 480 by 320, ST7796, GT911 capacitive touch) and the smaller ESP32-2432S028 (2.8 inch, 320 by 240, resistive touch; see "The 2.8 inch board" below). The rest of this README describes the first board unless it says otherwise. It plays **all 106 Starters (the 99 lessons and the 7 Graduations)** from the games' real DOS files, packed small into LittleFS (`web/scripts/pocketData.ts`), with a category library, touch controls for fingers and a stylus, a settings screen and a status strip. It plays each game's **PC speaker sounds** (no Sound Blaster clips or music yet).
 
-The flashed firmware binaries' third-party notices are in [`web/public/pocket/fw/NOTICES.txt`](../../web/public/pocket/fw/NOTICES.txt). Keep that file with the firmware image set when redistributing it.
+The flashed firmware binaries' third-party notices are in [`web/public/pocket/fw/NOTICES.txt`](https://github.com/lewismoten/GameMaker-SandboxEdition/blob/develop/web/public/pocket/fw/NOTICES.txt). Keep that file with the firmware image set when redistributing it.
 
 The play rules are `src/gmcore.h`, a port of the web engine's character, touch, scroll, block-effect and scene code (itself from `code/GM/PLAYGAME.C`) with no board code in it, so the same file runs in the Mac test. Monsters (`src/gmmon.h`, a port of the web engine's `monsters.ts`) are in. **Sound** is queued by the core as events and played by `src/speaker.h` (see Sound below). Not ported: Sound Blaster .VOC clips, FM music, the joystick. The Sandbox games with more than 12 levels or 16 links are left out; the others go on a microSD card (see below) (`npx vite-node scripts/pocketData.ts --list --series any` says why for each).
 
@@ -30,8 +32,8 @@ Two of these were identified on 2026-11-05 (printed "ESP32 2432S028" on the back
 Build and flash it (env `cyd-2432s028`; the first board's is `esp32-3248s035`, and each build writes its own folder under `.pio/build/`):
 
 ```sh
-npm run heavy -- ~/.platformio/penv/bin/pio run -d hardware/pocket-player -e cyd-2432s028 -t upload --upload-port /dev/cu.usbserial-XXXX
-npm run heavy -- ~/.platformio/penv/bin/pio run -d hardware/pocket-player -e cyd-2432s028 -t uploadfs --upload-port /dev/cu.usbserial-XXXX   # the Starters, once
+pio run -e cyd-2432s028 -t upload --upload-port /dev/cu.usbserial-XXXX
+pio run -e cyd-2432s028 -t uploadfs --upload-port /dev/cu.usbserial-XXXX   # the Starters, once
 ```
 
 Everything but the layout is the same program (`-DPOCKET_CYD28` in `platformio.ini` picks the board in `src/board.h`, `src/screen.h`, `src/controls.h` and `src/main.cpp`). The game is drawn at 1x (320 by 200) with a 40 px status strip below it; the controls are drawn over the game at about two thirds of the big board's size, and the list shows four games a page. The first board's play layout is unchanged (`scr::SMALL` is false there). The card, the speaker (GPIO 26) and the RGB LED (a status light; see Pressed buttons below) are as on the first board; the card uses the same pins.
@@ -205,7 +207,7 @@ After the display setup (2.8 inch) or at the first start (3.5 inch), once the ga
 2. **Pick your hand:** two big buttons, Pad left (right-handed) and Pad right (left-handed). This sets Hand.
 3. **Try the controls:** the real pad (floating if Pad position is Float) and Jump over a gray field. Each key lights up and its name shows on the bottom line. **Done** sits at the top, between the pad's side and Jump's side.
 
-**The hands** are Lewis Moten's ChatGPT-made vector art, `art/hand-left.svg` (a left hand; the right one is its mirror), colored a friendly mint green with a blue cuff rather than a skin tone. `tools/svgHand.py` flattens its paths (M/L/H/V/Q/C/Z) to polygons and writes `src/handshape.h`; `src/handdraw.h` fills them with anti-aliased edges and strokes their outlines. Change the art, then rerun `python3 hardware/pocket-player/tools/svgHand.py` (stdlib only) and rebuild. `host/firstruntest.cpp` checks the shapes, the thumbnail landing on the pad and Jump, and the mirror.
+**The hands** are Lewis Moten's ChatGPT-made vector art, `art/hand-left.svg` (a left hand; the right one is its mirror), colored a friendly mint green with a blue cuff rather than a skin tone. `tools/svgHand.py` flattens its paths (M/L/H/V/Q/C/Z) to polygons and writes `src/handshape.h`; `src/handdraw.h` fills them with anti-aliased edges and strokes their outlines. Change the art, then rerun `python3 tools/svgHand.py` (stdlib only) and rebuild. `host/firstruntest.cpp` checks the shapes, the thumbnail landing on the pad and Jump, and the mirror.
 
 Done writes `firstrun` in NVS (namespace `pocket`) and saves the settings, so the flow never comes back on its own. Settings, Controls, Practice: **Hold it** replays all three steps (the hands first) and **Try pad** opens the playground alone; its Done goes back to Settings. Over serial, `FIRST reset` erases only that key (never the rest of NVS) and `FIRST` opens the flow from the game list.
 
@@ -253,11 +255,11 @@ It prints a table and exits 1 on a failed load, a stack high-water under 1024 by
 PlatformIO's core CLI lives in a venv (`~/.platformio/penv`). From the repository root:
 
 ```sh
-npm run heavy -- ~/.platformio/penv/bin/pio run -d hardware/pocket-player                 # firmware
-npm run heavy -- ~/.platformio/penv/bin/pio run -d hardware/pocket-player -t buildfs      # LittleFS image from data/
+pio run                 # firmware
+pio run -t buildfs      # LittleFS image from data/
 ```
 
-Then copy `bootloader.bin`, `partitions.bin`, `firmware.bin` and `littlefs.bin` from `hardware/pocket-player/.pio/build/<env>/` into `web/public/pocket/fw/<env>/` (build both envs; each needs its own `-e <env>` and `-t buildfs`). The offsets in the two manifests in `web/public/pocket/` match `partitions.csv`: bootloader 0x1000, partitions 0x8000, firmware 0x10000, LittleFS 0x110000 (3 MB).
+Then copy `bootloader.bin`, `partitions.bin`, `firmware.bin` and `littlefs.bin` from `.pio/build/<env>/` into `web/public/pocket/fw/<env>/` (build both envs; each needs its own `-e <env>` and `-t buildfs`). The offsets in the two manifests in `web/public/pocket/` match `partitions.csv`: bootloader 0x1000, partitions 0x8000, firmware 0x10000, LittleFS 0x110000 (3 MB).
 
 The browser installer covers both boards (see "Flash it from the browser"); `pio` as above is the other way.
 
@@ -335,7 +337,7 @@ PTH1 stores 96×60 indices and 256 RGB565 colors (6,284 raw bytes), wrapped in t
 raw-length + deflate format. The large board enlarges to 144×90. The board draws one row
 at a time, never a whole-page framebuffer.
 
-The packer optionally reads a local CYD-friendliness research file;
+The packer optionally reads a `cyd-friendly.json` score file kept by the Game-Maker maintainer;
 `--scores <file>` overrides it. Missing scores omit Good on touch. Secret games are filtered
 before preview generation, indexing and counts. Build gates cap compressed thumbnails at
 384 KiB and the flash index at 64 KiB. The 512-game catalog uses 41,904 bytes, including
@@ -356,8 +358,8 @@ a new directory scan. Gameplay never requires the cache. Card write failures do 
 Host checks: `cd web && npx vite-node scripts/pocketControlsCheck.ts` includes `host/librarytest.cpp`
 for both exact layouts, real packed previews, touch gaps, partial/empty pages, clipped DOS
 names, metadata/cache corruption, UTF-8 bounds and memory limits. To retain the renders,
-compile that host test with `-std=c++17 -I hardware/pocket-player/src -lz`, then run
-`librarytest hardware/pocket-player/data <output-directory>`; it writes PPM files convertible
+compile that host test with `-std=c++17 -I src -lz`, then run
+`librarytest data <output-directory>`; it writes PPM files convertible
 to PNG. `src/export/pocketLibrary.test.ts` checks package compatibility, stages, identity,
 collisions, secret exclusion and generated preview/index budgets.
 
@@ -383,7 +385,7 @@ real touch, SD removal/full-card behavior, tight-level heap and largest block, a
 cold/warm discovery, page and search timings. Serial `BOOT` / `LIB` lines report the latter;
 host tests cannot establish those hardware timings.
 
-The pad drawing is shared by `src/paddraw.h` and `host/paddrawtest.cpp`. `web/scripts/pocketControlsCheck.ts` checks its framebuffer snapshots on both boards, all three sizes, both hands, idle/held states and both software turns. To inspect it, compile the host test with `-DPOCKET_CYD28 -I hardware/pocket-player/src` and pass an output PPM path: rows are small, medium and large; columns are right-handed idle/held, then left-handed idle/held.
+The pad drawing is shared by `src/paddraw.h` and `host/paddrawtest.cpp`. `web/scripts/pocketControlsCheck.ts` checks its framebuffer snapshots on both boards, all three sizes, both hands, idle/held states and both software turns. To inspect it, compile the host test with `-DPOCKET_CYD28 -I src` and pass an output PPM path: rows are small, medium and large; columns are right-handed idle/held, then left-handed idle/held.
 
 **Hand pictures (`hand()` in `src/firstrun.h`).** Each first-run hand is built finger by finger from tapered capsules (distance fields) placed from the board's lower corner: the palm's heel, wrist and two-segment thumb as one form over the glass, the curled index finger and the middle and ring fingertips drawn behind the board's edge, and a cuff. Each shape has its own outline, one shade and anti-aliased edges; the right hand is a mirror image. `host/firstruntest.cpp` renders it on both boards.
 
