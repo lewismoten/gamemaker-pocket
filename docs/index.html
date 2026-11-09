@@ -89,6 +89,18 @@
       label.ack input { width: 24px; height: 24px; flex: none; margin: 0; accent-color: #0a5a99; }
       footer { border-top: 1px solid var(--rule); padding: 10px 0 18px; font-size: 0.82rem; color: var(--muted); }
       footer p { margin: 0; }
+      .btn { font: 700 0.8rem/1.2 var(--pixel); letter-spacing: 0.04em; text-transform: uppercase; color: #fff; background: #0a5a99; border: 2px solid #0a5a99; border-radius: 4px; padding: 10px 16px; min-height: 44px; cursor: pointer; }
+      .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+      .btn.small-btn { font-size: 0.7rem; padding: 4px 10px; min-height: 32px; color: var(--fg); background: var(--panel); border-color: var(--line); }
+      @media (prefers-color-scheme: dark) { .btn { background: #78b8f8; border-color: #78b8f8; color: #101428; } }
+      #p-send ul, #p-send ol { padding-left: 0; list-style: none; }
+      .gamerow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--rule); }
+      .gamerow .gname { flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.88rem; }
+      .okline { color: var(--ok); } .noline { color: var(--no); }
+      progress { width: 100%; height: 18px; accent-color: #0a5a99; }
+      #send-picked li { margin: 4px 0; overflow-wrap: anywhere; }
+      #delivery-stage { min-height: 0; }
+      #send-files { max-width: 100%; }
       @media (max-width: 900px) {
         main { grid-template-columns: 1fr; gap: 20px; }
         .hero-board { display: none; }
@@ -120,6 +132,7 @@
           <div role="tablist" aria-label="Sections">
             <button role="tab" id="tab-install" aria-controls="p-install" aria-selected="true">1. Install</button>
             <button role="tab" id="tab-games" aria-controls="p-games" aria-selected="false" tabindex="-1">2. Add games</button>
+            <button role="tab" id="tab-send" aria-controls="p-send" aria-selected="false" tabindex="-1">3. Send games</button>
             <button role="tab" id="tab-other" aria-controls="p-other" aria-selected="false" tabindex="-1">Other boards</button>
           </div>
 
@@ -164,7 +177,7 @@
 
           <div role="tabpanel" id="p-games" aria-labelledby="tab-games" hidden>
             <h2>Adding games to a microSD card</h2>
-            <p class="small">The starter games (or the 106 Starters) are already on the board if you chose them. Any other game goes on a card, one <code>.GMP</code> file each.</p>
+            <p class="small">The starter games (or the 106 Starters) are already on the board if you chose them. Any other game goes on a card, one <code>.GMP</code> file each. No card? The <a href="#send">Send games</a> tab puts them in the board's flash over USB.</p>
             <ol>
               <li><strong>Get games.</strong> On the <a href="https://lewismoten.github.io/GameMaker-SandboxEdition/">Game-Maker: Sandbox Edition</a> site, open a game and choose Download, then <em>Pocket Player (microSD)</em>. It saves <code>NAME.GMP</code>.</li>
               <li><strong>Card.</strong> A microSD card formatted FAT32. Cards from 2 to 32 GB usually come that way; bigger cards usually come as exFAT, so reformat them as FAT32 first.</li>
@@ -186,6 +199,27 @@
               <li><strong>A game is missing:</strong> check the name rules, that the file is in <code>/pocket</code> itself, then rescan.</li>
             </ul>
             <p class="small">Source: <code>scanCardBatch</code> and <code>mountSD</code> in <code>src/main.cpp</code>, <code>src/cardmsg.h</code>, <code>docs/FIRMWARE.md</code>.</p>
+          </div>
+
+          <div role="tabpanel" id="p-send" aria-labelledby="tab-send" hidden>
+            <h2>Send games over the USB cable</h2>
+            <p class="small">For a board with no microSD card. Pick <code>.GMP</code> files (the <em>Pocket Player (microSD)</em> download on the <a href="https://lewismoten.github.io/GameMaker-SandboxEdition/">Game-Maker: Sandbox Edition</a> site) and they are stored in the board's own flash. Desktop Chrome or Edge only.</p>
+            <div class="note"><strong>Works only after the firmware is installed</strong> (the Install tab; older firmware can't do this). Connecting can restart the board, so give it a few seconds, and leave it on its game list, not in Settings, the first-run steps or a game. Close other programs that use the board's USB port.</div>
+            <p><button type="button" class="btn" id="send-connect">Connect to the board</button> <button type="button" class="btn small-btn" id="send-disconnect" hidden>Disconnect</button></p>
+            <p id="send-status" class="small st" role="status" aria-live="polite">Not connected.</p>
+            <div id="send-board" hidden>
+              <h2>On the board</h2>
+              <p id="send-space" class="small"></p>
+              <meter id="send-meter" aria-label="Board storage used" style="width:100%"></meter>
+              <ol id="send-list"></ol>
+              <h2>Add games</h2>
+              <p><label for="send-files">Choose <code>.GMP</code> files</label><br /><input type="file" id="send-files" accept=".gmp,.GMP" multiple /></p>
+              <ul id="send-picked" aria-live="polite"></ul>
+              <p><button type="button" class="btn" id="send-go" disabled>Send to the board</button></p>
+              <progress id="send-progress" hidden value="0" max="1"></progress>
+              <div id="delivery-stage" aria-hidden="true"></div>
+              <p class="small">Each piece is checked on the board and the game appears only when all of it has arrived. A big game takes a few minutes (the cable is slow). A name longer than 8 letters is shortened. A game with the same name replaces the old one.</p>
+            </div>
           </div>
 
           <div role="tabpanel" id="p-other" aria-labelledby="tab-other" hidden>
@@ -242,5 +276,6 @@ esptool.py --port PORT write_flash 0 backup.bin</pre>
     </div>
     <script type="module" src="ewt/install-button.js"></script>
     <script type="module" src="install.js"></script>
+    <script type="module" src="send.js"></script>
   </body>
 </html>
