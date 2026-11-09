@@ -3,89 +3,234 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Pocket Player Install</title>
+    <title>Game-Maker Pocket: install</title>
     <meta name="description" content="Flash the Game-Maker Pocket Player onto an ESP32 touch-screen board from your browser." />
-    <meta property="og:title" content="Game-Maker Pocket Player: install" />
-    <meta property="og:description" content="Pick your board and flash it from Chrome or Edge." />
+    <meta property="og:title" content="Game-Maker Pocket: install" />
+    <meta property="og:description" content="DOS games in your pocket. Pick your board and flash it from Chrome or Edge." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="images/social-preview-1280x640.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="favicon.ico" />
-    <!-- ESP Web Tools is vendored in ewt/ (Apache-2.0), so nothing loads from outside. -->
+    <link rel="preload" href="fonts/silkscreen-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- Everything is bundled: ESP Web Tools in ewt/ (Apache-2.0), Silkscreen in fonts/ (SIL OFL 1.1). Nothing loads from outside. -->
     <style>
-      :root { color-scheme: light dark; --bg: #fff; --fg: #111; --muted: #444; --line: #767676; --link: #0a5a99; --sel: #e6f0fa; }
-      @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #eee; --muted: #bbb; --line: #8a8a8a; --link: #8cf; --sel: #1b2b3b; } }
-      body { font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 16px; background: var(--bg); color: var(--fg); }
-      a { color: var(--link); }
-      h1 { font-size: 1.4rem; }
-      h2 { font-size: 1.1rem; margin-top: 1.5rem; }
+      @font-face { font-family: Silkscreen; font-weight: 400; font-display: swap; src: url(fonts/silkscreen-latin-400-normal.woff2) format('woff2'); }
+      @font-face { font-family: Silkscreen; font-weight: 700; font-display: swap; src: url(fonts/silkscreen-latin-700-normal.woff2) format('woff2'); }
+      :root {
+        color-scheme: light dark;
+        --bg: #eef3fb; --panel: #fff; --fg: #101428; --muted: #3d4766; --rule: #b9c4dc; --line: #6b7694;
+        --yellow: #7a5a00; --yellow-fill: #f8d450; --blue: #0a5a99; --sel: #e3eefc;
+        --warn-bg: #fff4d6; --warn-line: #8a6500; --ok: #0b6b2e; --no: #9b1c1c;
+        --pixel: Silkscreen, 'Courier New', monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101428; --panel: #161c36; --fg: #f2f5ff; --muted: #b4bfdc; --rule: #26305a; --line: #6f7ca8;
+          --yellow: #f8d450; --yellow-fill: #f8d450; --blue: #78b8f8; --sel: #1c2748;
+          --warn-bg: #2a2410; --warn-line: #f8d450; --ok: #7be39a; --no: #ff9a9a;
+        }
+      }
+      * { box-sizing: border-box; }
+      html { background: var(--bg); }
+      body { margin: 0; font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--fg); }
+      a { color: var(--blue); }
+      a:focus-visible, button:focus-visible, [role='tab']:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+      .wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+      main { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 32px; padding: 20px 0 12px; align-items: start; border-top: 1px solid var(--rule); margin-top: 12px; }
+      .edition { display: flex; align-items: center; gap: 14px; margin: 0 0 8px; }
+      .edition img { width: 52px; height: 52px; image-rendering: pixelated; flex: none; }
+      .edition span { font: 400 1.05rem/1.2 var(--pixel); color: var(--yellow); letter-spacing: 0.08em; text-transform: uppercase; }
+      h1 { margin: 0; font: 700 clamp(1.7rem, 4.4vw, 2.9rem)/1.05 var(--pixel); letter-spacing: 0; text-transform: uppercase; white-space: nowrap; }
+      h1 em { display: block; font-style: normal; color: var(--yellow); }
+      .tag { font: 400 1.05rem/1.4 var(--pixel); letter-spacing: 0.06em; margin: 16px 0 4px; text-transform: uppercase; }
+      .chips { font: 400 0.8rem/1.4 var(--pixel); color: var(--muted); letter-spacing: 0.08em; margin: 0 0 12px; text-transform: uppercase; }
+      figure { margin: 12px 0 0; }
+      figure img { display: block; width: 100%; max-width: 440px; height: auto; image-rendering: pixelated; }
+      figcaption { font: 400 0.75rem/1.4 var(--pixel); color: var(--muted); letter-spacing: 0.08em; margin-top: 6px; text-transform: uppercase; }
+      .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; min-width: 0; }
+      [role='tablist'] { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--rule); }
+      [role='tab'] { font: 400 0.82rem/1.2 var(--pixel); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 14px; min-height: 44px; cursor: pointer; }
+      [role='tab'][aria-selected='true'] { color: var(--fg); border-bottom-color: var(--yellow-fill); }
+      [role='tabpanel'] { padding: 16px 18px 18px; }
+      [role='tabpanel'][hidden] { display: none; }
+      h2 { font: 700 0.95rem/1.3 var(--pixel); letter-spacing: 0.04em; margin: 16px 0 8px; text-transform: uppercase; color: var(--blue); }
+      h2:first-child { margin-top: 0; }
       fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-      legend { font-weight: 600; padding: 0; margin-bottom: 0.5rem; }
-      .choice { display: flex; gap: 12px; align-items: center; border: 2px solid var(--line); border-radius: 8px; padding: 10px; margin: 0 0 10px; cursor: pointer; }
-      .choice:has(input:checked) { border-color: var(--link); background: var(--sel); }
-      .choice:has(input:focus-visible) { outline: 3px solid var(--link); outline-offset: 2px; }
-      .choice input { width: 24px; height: 24px; flex: none; }
-      .choice img { width: calc(var(--mm) * 1.4px); max-width: 100%; height: auto; flex: none; }
-      .choice b { display: block; }
-      .choice span { color: var(--muted); font-size: 0.94rem; }
-      @media (max-width: 420px) { .choice { flex-wrap: wrap; } .choice img { width: calc(var(--mm) * 1.1px); } }
-      #install-slot { min-height: 3rem; }
-      /* the vendored button's default blue gives white text 2.6:1; this one gives about 6:1 */
+      legend { padding: 0; margin-bottom: 8px; color: var(--muted); font-size: 0.94rem; }
+      .boards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .choice { display: flex; flex-direction: column; gap: 8px; border: 2px solid var(--line); border-radius: 4px; padding: 12px; cursor: pointer; background: var(--panel); position: relative; min-width: 0; }
+      .choice:hover { border-color: var(--blue); }
+      .choice:has(input:checked) { border-color: var(--yellow-fill); background: var(--sel); box-shadow: 0 0 0 2px var(--yellow-fill); }
+      .choice:has(input:focus-visible) { outline: 3px solid var(--blue); outline-offset: 3px; }
+      .choice input { position: absolute; top: 10px; left: 10px; width: 24px; height: 24px; margin: 0; accent-color: #0a5a99; }
+      .choice img { display: block; width: 100%; max-width: 200px; height: auto; margin: 0 auto; }
+      .choice b { display: block; font: 700 0.8rem/1.3 var(--pixel); letter-spacing: 0.03em; text-transform: uppercase; padding-left: 32px; }
+      .choice span { color: var(--muted); font-size: 0.88rem; }
+      ol, ul { margin: 0 0 8px; padding-left: 1.3rem; }
+      li { margin: 2px 0; }
+      #install-slot, #other-slot { min-height: 3rem; margin-top: 10px; }
       esp-web-install-button { --esp-tools-button-color: #0a5a99; }
-      details { margin-top: 1.5rem; }
-      summary { cursor: pointer; padding: 4px 0; }
-      code { overflow-wrap: anywhere; }
+      .note { background: var(--warn-bg); border-left: 4px solid var(--warn-line); padding: 8px 12px; margin: 10px 0; font-size: 0.93rem; }
+      .small { font-size: 0.9rem; color: var(--muted); }
+      table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+      th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+      thead th { font: 400 0.7rem/1.3 var(--pixel); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+      tbody th { font-weight: 600; }
+      .tablewrap { overflow-x: auto; }
+      .st { font-weight: 700; }
+      .st.ok { color: var(--ok); } .st.mid { color: var(--yellow); } .st.no { color: var(--no); }
+      code { font: 0.88em ui-monospace, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+      pre { background: var(--bg); border: 1px solid var(--rule); padding: 8px 10px; overflow-x: auto; font-size: 0.82rem; margin: 6px 0; }
+      details { margin: 6px 0; }
+      summary { cursor: pointer; padding: 4px 0; min-height: 24px; }
+      label.ack { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; cursor: pointer; }
+      label.ack input { width: 24px; height: 24px; flex: none; margin: 0; accent-color: #0a5a99; }
+      footer { border-top: 1px solid var(--rule); padding: 10px 0 18px; font-size: 0.82rem; color: var(--muted); }
+      footer p { margin: 0; }
+      @media (max-width: 900px) {
+        main { grid-template-columns: 1fr; gap: 20px; }
+        .hero-board { display: none; }
+      }
+      @media (max-width: 520px) {
+        .boards { grid-template-columns: 1fr; }
+        [role='tabpanel'] { padding: 14px 12px; }
+        [role='tab'] { padding: 10px 9px; font-size: 0.74rem; }
+      }
+      @media (prefers-reduced-motion: no-preference) { .choice { transition: border-color 0.15s, background 0.15s; } }
     </style>
   </head>
   <body>
-    <main>
-      <h1>Game-Maker Pocket Player: install</h1>
-      <p>This puts the Pocket Player on a small ESP32 touch-screen board, from your browser. Nothing to install on your computer.</p>
-      <h2>1. Which board?</h2>
-      <fieldset>
-        <legend>Pick the one you have. The model name is printed on the back of the board.</legend>
-        <label class="choice">
-          <input type="radio" name="board" value="35" />
-          <img style="--mm: 99" src="img/board-35.svg" alt="Drawing of the 3.5 inch board: a wide orange board with a large screen" width="297" height="165" />
-          <div><b>3.5 inch screen (ESP32-3248S035)</b><span>The bigger board. The screen is 480 by 320 and answers to a light finger touch.</span></div>
-        </label>
-        <label class="choice">
-          <input type="radio" name="board" value="28" />
-          <img style="--mm: 86" src="img/board-28.svg" alt="Drawing of the 2.8 inch board: a smaller orange board with a squarer screen" width="258" height="150" />
-          <div><b>2.8 inch screen (ESP32-2432S028)</b><span>The smaller board, often called the Cheap Yellow Display. The screen is 320 by 240 and needs a firmer press, or a stylus.</span></div>
-        </label>
-      </fieldset>
-      <p><small>The pictures are drawings, not photos. Boards from different sellers can look a little different; the printed model name is what counts.</small></p>
-      <h2>2. Install</h2>
-      <ol>
-        <li>Use desktop Chrome or Edge. Firefox, Safari and phones can't do this.</li>
-        <li>Plug the board into the computer with a USB cable that carries data (some charge-only cables don't).</li>
-        <li>Pick your board above, click Install, choose the board's serial port, and click Install again.</li>
-        <li>If the window can't connect, hold the board's BOOT button while you plug it in (or while you click Install), then try again.</li>
-        <li>Wait for it to finish (about a minute). The board restarts by itself.</li>
-      </ol>
-      <div id="install-slot"><p>Pick a board first.</p></div>
-      <h2>What gets installed</h2>
-      <p>
-        The player's firmware, and the library: the Starter games and their thumbnails, stored in the board's own flash. The install writes the board's whole
-        flash, so it replaces what was on it, including the player's saved settings (display setup, touch calibration), and the first start walks you
-        through setup again. A microSD card is not touched: your games on it stay.
-      </p>
-      <details>
-        <summary>About Wi-Fi setup (Improv)</summary>
+    <div class="wrap">
+      <main>
+        <section aria-label="About">
+          <p class="edition"><img src="images/badge.png" width="52" height="52" alt="" /><span>Sandbox Edition</span></p>
+          <h1>Game-Maker <em>Pocket</em></h1>
+          <p class="tag">DOS games in your pocket</p>
+          <p class="chips">ESP32 / touchscreen / microSD</p>
+          <p class="small">Flash the Pocket Player onto a small ESP32 touch-screen board from your browser. Nothing to install on your computer.</p>
+          <figure class="hero-board">
+            <img src="images/board-library.png" width="577" height="413" alt="The Pocket Player's game library on a 3.5 inch board: six game tiles, page buttons and a Details button" />
+            <figcaption>ESP32-3248S035 / 3.5 in</figcaption>
+          </figure>
+        </section>
+
+        <section class="panel" aria-label="Installer">
+          <div role="tablist" aria-label="Sections">
+            <button role="tab" id="tab-install" aria-controls="p-install" aria-selected="true">1. Install</button>
+            <button role="tab" id="tab-games" aria-controls="p-games" aria-selected="false" tabindex="-1">2. Add games</button>
+            <button role="tab" id="tab-other" aria-controls="p-other" aria-selected="false" tabindex="-1">Other boards</button>
+          </div>
+
+          <div role="tabpanel" id="p-install" aria-labelledby="tab-install">
+            <h2>Pick your board</h2>
+            <fieldset>
+              <legend>The model name is printed on the back of the board.</legend>
+              <div class="boards">
+                <label class="choice">
+                  <input type="radio" name="board" value="35" />
+                  <img src="img/board-35.svg" alt="Drawing of the 3.5 inch board: a wide orange board with a large screen" width="297" height="165" />
+                  <b>3.5 inch: ESP32-3248S035</b>
+                  <span>480 x 320, light finger touch (capacitive).</span>
+                </label>
+                <label class="choice">
+                  <input type="radio" name="board" value="28" />
+                  <img src="img/board-28.svg" alt="Drawing of the 2.8 inch board: a smaller orange board with a squarer screen" width="258" height="150" />
+                  <b>2.8 inch: ESP32-2432S028</b>
+                  <span>320 x 240, firmer press or stylus (resistive). The "Cheap Yellow Display".</span>
+                </label>
+              </div>
+            </fieldset>
+            <p class="small">The pictures are drawings, not photos. Another model? See the Other boards tab first.</p>
+            <div id="install-slot"><p class="small">Pick a board to show the Install button.</p></div>
+            <h2>Steps</h2>
+            <ol>
+              <li>Desktop Chrome or Edge (Firefox, Safari and phones can't flash).</li>
+              <li>Plug the board in with a USB cable that carries data.</li>
+              <li>Click Install, choose the board's serial port, click Install again. It takes a few minutes.</li>
+              <li>If it can't connect, hold the BOOT button while plugging in or while clicking Install.</li>
+            </ol>
+            <h2>What gets installed</h2>
+            <p class="small" id="what">STATUS_PLACEHOLDER</p>
+          </div>
+
+          <div role="tabpanel" id="p-games" aria-labelledby="tab-games" hidden>
+            <h2>Adding games to a microSD card</h2>
+            <p class="small">The 106 Starters are already on the board. More games go on a card, one <code>.GMP</code> file each.</p>
+            <ol>
+              <li><strong>Get games.</strong> On the <a href="https://github.com/lewismoten/GameMaker-SandboxEdition">Game-Maker: Sandbox Edition</a> site, open a game and choose Download, then <em>Pocket Player (microSD)</em>. It saves <code>NAME.GMP</code>. (The button's name comes from the firmware notes; I haven't opened that site to confirm.)</li>
+              <li><strong>Card.</strong> A microSD card formatted FAT32 (the firmware's own message says "The card should be FAT32"). 2 to 32 GB is the safe size; bigger cards usually come as exFAT, and nothing in the firmware says it reads exFAT (unverified).</li>
+              <li><strong>Folder.</strong> Make a folder named <code>pocket</code> at the top of the card and copy the <code>.GMP</code> files into it. Files in subfolders are ignored.</li>
+              <li><strong>Names.</strong> The part before <code>.GMP</code> is 1 to 11 letters, digits, <code>_</code> or <code>-</code> (no spaces). The extension may be upper or lower case.</li>
+              <li><strong>Put it in.</strong> Switch the board off, insert the card, switch on. Or, with the board on, open Settings, Card, Rescan. Card games show a yellow SD tag.</li>
+            </ol>
+            <h2>Good to know</h2>
+            <ul>
+              <li>The list holds up to 512 games. A game whose id is already listed (a Starter, say) is skipped.</li>
+              <li>A file the player can't read as a game pack (wrong name, not format 1, damaged) is skipped without a message: it just isn't listed.</li>
+              <li>The player writes only inside <code>/pocket</code>: a library cache (<code>LIBRARY.CCH</code>) and display setups in <code>boards/</code>. Keep <code>boards/</code>.</li>
+            </ul>
+            <h2>Troubleshooting</h2>
+            <ul>
+              <li><strong>"No card":</strong> the card didn't mount. Re-seat it, then Settings, Card, Rescan.</li>
+              <li><strong>"Can't read the card":</strong> it should be FAT32. Reformat as FAT32 (MBR) on your computer.</li>
+              <li><strong>"No pocket folder":</strong> the folder must be named <code>pocket</code>, at the top of the card.</li>
+              <li><strong>A game is missing:</strong> check the name rules, that the file is in <code>/pocket</code> itself, then rescan.</li>
+            </ul>
+            <p class="small">Source: <code>scanCardBatch</code> and <code>mountSD</code> in <code>src/main.cpp</code>, <code>src/cardmsg.h</code>, <code>docs/FIRMWARE.md</code>.</p>
+          </div>
+
+          <div role="tabpanel" id="p-other" aria-labelledby="tab-other" hidden>
+            <h2>Other or unknown board</h2>
+            <p class="small">The two boards on the Install tab are the ones this firmware was written for. Other ESP32 touch-screen boards can look the same but differ in the display chip or the touch chip. Read this before flashing one.</p>
+            <h2>Fixed when the firmware is built</h2>
+            <p class="small">The pins, the screen size (320 x 240 or 480 x 320), the touch chip (XPT2046 resistive in the 2.8 build, GT911 capacitive in the 3.5 build), the 3.5 build's display driver (ST7796) and the chip family (plain ESP32). Source: <code>src/board.h</code>, <code>src/screen.h</code>, <code>platformio.ini</code>.</p>
+            <h2>Adjustable on the device</h2>
+            <p class="small">
+              Only the <strong>2.8 inch build</strong> has the display setup (first start, then BOOT or Settings, Display, Panel setup): driver (ILI9341 or ST7789), inverted colors, red and blue swapped, mirror and orientation, and touch calibration, saved per chip.
+              The <strong>3.5 inch build has no setup screen</strong> (as far as I read: that code sits inside the 2.8 build only), so a wrong picture there can't be fixed on the device.
+            </p>
+            <h2>Variants</h2>
+            <div class="tablewrap">
+              <table>
+                <thead><tr><th scope="col">Board</th><th scope="col">Status</th><th scope="col">Why</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">ESP32-2432S028, usual ILI9341</th><td class="st ok">Works with setup</td><td>The supported board: pick 2.8 inch.</td></tr>
+                  <tr><th scope="row">ESP32-2432S028 with two USB ports ("2 USB", ST7789)</th><td class="st ok">Works with setup</td><td>The firmware has an ST7789 driver for this revision: choose it in Panel setup (or hold BOOT 2 seconds on the list). From <code>docs/FIRMWARE.md</code>; not tested on one here.</td></tr>
+                  <tr><th scope="row">28 board with inverted or red/blue-swapped colors</th><td class="st ok">Works with setup</td><td>Color bits in Panel setup (<code>src/displaysetup.h</code>).</td></tr>
+                  <tr><th scope="row">ESP32-3248S035 with resistive touch ("R")</th><td class="st mid">Needs a different build</td><td>The 3.5 build reads a GT911 capacitive chip only (<code>src/gt911.h</code>); no build here pairs 480 x 320 with resistive touch.</td></tr>
+                  <tr><th scope="row">ESP32-2432S024 2.4 inch (R or C)</th><td class="st no">Not supported yet</td><td>No build for it. Guess, unchecked: pins close to the 2.8, and the C version has a capacitive chip.</td></tr>
+                  <tr><th scope="row">ESP32-2432S032 3.2 inch</th><td class="st no">Not supported yet</td><td>No build for it. Guess, unchecked: its own touch wiring.</td></tr>
+                  <tr><th scope="row">ESP32-S3 touch boards (larger Sunton and similar)</th><td class="st no">Not supported yet</td><td>A different chip. The installer says "Your ESP32-S3 board is not supported" and writes nothing (ESP Web Tools code in <code>ewt/</code>).</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small">Facts beyond the firmware's own notes are marked as guesses and not checked. Community lists: <a href="https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display">witnessmenow's Cheap Yellow Display notes</a> and <a href="https://github.com/rzeldent/platformio-espressif32-sunton">rzeldent's Sunton board definitions</a> (the firmware's pins came from them; see <code>NOTICE.md</code>).</p>
+            <div class="note">
+              <strong>Before you flash an unlisted board.</strong> You may see wrong colors, a mirrored or turned picture, touches in the wrong place, or a blank screen. On a 2.8 inch style board, open Panel setup (hold BOOT 2 seconds on the list, or tap the top left of the title bar) and step through the choices. Installing rewrites four parts of the board's flash. To go back, flash the board's own firmware again, or restore a backup made first.
+            </div>
+            <details>
+              <summary>Back up and restore with esptool</summary>
+              <p class="small">ESP Web Tools can't back up. With <code>esptool</code> installed (<code>pip install esptool</code>) and your board's serial port as <code>PORT</code>:</p>
+              <pre>esptool.py --port PORT read_flash 0 0x400000 backup.bin
+esptool.py --port PORT write_flash 0 backup.bin</pre>
+              <p class="small">The first line saves the whole 4 MB flash (several minutes); the second puts it back. A board with another flash size needs that size.</p>
+            </details>
+            <h2>Install the 2.8 inch build on a similar board</h2>
+            <label class="ack"><input type="checkbox" id="ack" /> <span>I have read the warning. My board is a 2.8 inch style ESP32 (plain ESP32 chip) with resistive touch, and I accept that it may need setup.</span></label>
+            <div id="other-slot"><p class="small">Tick the box to show the Install button.</p></div>
+            <p class="small">The installer checks the chip: anything that isn't a plain ESP32 is refused. It can't tell the 2.8 board from the 3.5 board; both are plain ESP32 chips.</p>
+          </div>
+        </section>
+      </main>
+      <footer>
         <p>
-          The install window can also offer "Connect to Wi-Fi" once the board has restarted. That works when the board's program speaks Improv Wi-Fi, a small
-          open protocol that sends the network name and password over the same USB cable. The Pocket Player
-          doesn't speak it yet, so you won't see that button.
+          <a href="https://github.com/lewismoten/gamemaker-pocket">gamemaker-pocket</a> (source, notices). Games:
+          <a href="https://github.com/lewismoten/GameMaker-SandboxEdition">Game-Maker: Sandbox Edition</a>. Installer:
+          <a href="https://esphome.github.io/esp-web-tools/">ESP Web Tools</a> (Apache-2.0: <a href="ewt/LICENSE-esp-web-tools.txt">license</a>, <a href="ewt/THIRD-PARTY.txt">parts</a>).
+          Headings: Silkscreen (<a href="fonts/OFL-Silkscreen.txt">SIL Open Font License</a>). <a href="fw/NOTICES.txt">Firmware notices</a>.
         </p>
-      </details>
-      <h2>Getting more games</h2>
-      <p>
-        More games go on a FAT32 microSD card, in a folder named <code>pocket</code>, one <code>.GMP</code> file each. They come from
-        <a href="https://github.com/lewismoten/GameMaker-SandboxEdition">Game-Maker: Sandbox Edition</a>: on a game's page, choose Download, then Pocket Player (microSD).
-      </p>
-      <p><small>Source and notices: <a href="https://github.com/lewismoten/gamemaker-pocket">gamemaker-pocket on GitHub</a>. The install button is <a href="https://esphome.github.io/esp-web-tools/">ESP Web Tools</a> (Apache-2.0), bundled in <code>ewt/</code> with its license.</small></p>
-    </main>
+      </footer>
+    </div>
     <script type="module" src="ewt/install-button.js"></script>
     <script type="module" src="install.js"></script>
   </body>
