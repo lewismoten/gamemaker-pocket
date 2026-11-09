@@ -157,8 +157,8 @@
             <h2>Adding games to a microSD card</h2>
             <p class="small">The 106 Starters are already on the board. More games go on a card, one <code>.GMP</code> file each.</p>
             <ol>
-              <li><strong>Get games.</strong> On the <a href="https://github.com/lewismoten/GameMaker-SandboxEdition">Game-Maker: Sandbox Edition</a> site, open a game and choose Download, then <em>Pocket Player (microSD)</em>. It saves <code>NAME.GMP</code>. (The button's name comes from the firmware notes; I haven't opened that site to confirm.)</li>
-              <li><strong>Card.</strong> A microSD card formatted FAT32 (the firmware's own message says "The card should be FAT32"). 2 to 32 GB is the safe size; bigger cards usually come as exFAT, and nothing in the firmware says it reads exFAT (unverified).</li>
+              <li><strong>Get games.</strong> On the <a href="https://lewismoten.github.io/GameMaker-SandboxEdition/">Game-Maker: Sandbox Edition</a> site, open a game and choose Download, then <em>Pocket Player (microSD)</em>. It saves <code>NAME.GMP</code>.</li>
+              <li><strong>Card.</strong> A microSD card formatted FAT32. Cards from 2 to 32 GB usually come that way; bigger cards usually come as exFAT, so reformat them as FAT32 first.</li>
               <li><strong>Folder.</strong> Make a folder named <code>pocket</code> at the top of the card and copy the <code>.GMP</code> files into it. Files in subfolders are ignored.</li>
               <li><strong>Names.</strong> The part before <code>.GMP</code> is 1 to 11 letters, digits, <code>_</code> or <code>-</code> (no spaces). The extension may be upper or lower case.</li>
               <li><strong>Put it in.</strong> Switch the board off, insert the card, switch on. Or, with the board on, open Settings, Card, Rescan. Card games show a yellow SD tag.</li>
@@ -187,7 +187,7 @@
             <h2>Adjustable on the device</h2>
             <p class="small">
               Only the <strong>2.8 inch build</strong> has the display setup (first start, then BOOT or Settings, Display, Panel setup): driver (ILI9341 or ST7789), inverted colors, red and blue swapped, mirror and orientation, and touch calibration, saved per chip.
-              The <strong>3.5 inch build has no setup screen</strong> (as far as I read: that code sits inside the 2.8 build only), so a wrong picture there can't be fixed on the device.
+              The <strong>3.5 inch build has no setup screen</strong>, so a wrong picture there can't be fixed on the device.
             </p>
             <h2>Variants</h2>
             <div class="tablewrap">
@@ -204,7 +204,7 @@
                 </tbody>
               </table>
             </div>
-            <p class="small">Facts beyond the firmware's own notes are marked as guesses and not checked. Community lists: <a href="https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display">witnessmenow's Cheap Yellow Display notes</a> and <a href="https://github.com/rzeldent/platformio-espressif32-sunton">rzeldent's Sunton board definitions</a> (the firmware's pins came from them; see <code>NOTICE.md</code>).</p>
+            <p class="small">Facts beyond the firmware's own notes are marked as guesses and not checked. Community lists: <a href="https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display">witnessmenow's Cheap Yellow Display notes</a> and <a href="https://github.com/rzeldent/platformio-espressif32-sunton">rzeldent's Sunton board definitions</a> (the 3.5 inch board's speaker pin comes from rzeldent's definitions; see <code>NOTICE.md</code>).</p>
             <div class="note">
               <strong>Before you flash an unlisted board.</strong> You may see wrong colors, a mirrored or turned picture, touches in the wrong place, or a blank screen. On a 2.8 inch style board, open Panel setup (hold BOOT 2 seconds on the list, or tap the top left of the title bar) and step through the choices. Installing rewrites four parts of the board's flash. To go back, flash the board's own firmware again, or restore a backup made first.
             </div>
