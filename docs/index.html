@@ -150,7 +150,7 @@
               <li>If it can't connect, hold the BOOT button while plugging in or while clicking Install.</li>
             </ol>
             <h2>What gets installed</h2>
-            <p class="small" id="what">STATUS_PLACEHOLDER</p>
+            <p class="small" id="what">The player's firmware and its library (the 106 Starter games). The install writes four parts of the 4 MB flash: bootloader, partition table, firmware, and the library's LittleFS area (the last 3 MB). It <strong>replaces the Starters and the controls settings</strong> (<code>settings.txt</code> lives in that area). It <strong>keeps</strong> the display setup, touch calibration and other saved values (the board's NVS area, which is not written; checked on a real board: unchanged byte for byte after an install), and it never touches the microSD card. Anything else that was in the 3 MB library area is gone, so back it up first if you stored your own files there.</p>
           </div>
 
           <div role="tabpanel" id="p-games" aria-labelledby="tab-games" hidden>
