@@ -76,17 +76,25 @@ template <class G> int drawNotice(G& g, int W, int top, int bottom, const char* 
   for (int i = 0; i < n; i++) clippedText(g, all, lines[i], 24, y + hh + 10 + i * 10 * sc, sc, C_WHITE);
   return y + h;
 }
-// The page area when no game is listed: what the card says, in words. The box's bottom edge; 0 when there is nothing to say.
+// The "Check card" button under the empty-library notice: the same 44 pixel height on both boards. A tap reads the card again.
+inline Tile emptyButton(int W) { int bottom = footer(W) - 4; return {12, bottom - 44, W - 24, 44, 0, 0}; }
+inline bool inEmptyButton(int W, int x, int y) { Tile b = emptyButton(W); return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h; }
+// The page area when no game is listed (a player with no Starter courses and no card games): what to do, in words, and a button
+// that reads the card again (the board cannot sense a card going in). The notice's bottom edge; 0 when there is nothing to say.
 template <class G> int drawEmptyNotice(G& g, int W, CardState s, int count) {
-  int top = 40, bottom = footer(W) - 4;
+  int top = 40, bottom = emptyButton(W).y - 4;
+  int end = 0;
   switch (s) {
-    case CARD_NONE: return drawNotice(g, W, top, bottom, "No card", "Put a microSD card in the slot, then open Settings, Card, Rescan. Games kept in the Pocket Player itself are still listed.", C_YELLOW);
-    case CARD_UNREADABLE: return drawNotice(g, W, top, bottom, "Can't read the card", "Take it out and put it back in. The card should be FAT32. Then open Settings, Card, Rescan.", C_YELLOW);
-    case CARD_NOFOLDER: return drawNotice(g, W, top, bottom, "No pocket folder", "The card has no folder named pocket. Make one on a computer and copy .gmp games into it.", C_YELLOW);
-    case CARD_READING: { char b[48]; snprintf(b, sizeof b, "Looking for games. Found so far: %d.", count); return drawNotice(g, W, top, bottom, "Reading the card", b, C_WHITE); }
-    case CARD_READY: return drawNotice(g, W, top, bottom, "No games found", "Copy .gmp game files into the pocket folder on the card.", C_WHITE);
+    case CARD_NONE: case CARD_READY:
+      end = drawNotice(g, W, top, bottom, "No games yet", "Put .GMP games in a folder named POCKET on a FAT32 microSD card and insert it, then tap Check card. Games and help: the Game-Maker: Sandbox Edition site.", C_WHITE); break;
+    case CARD_UNREADABLE: end = drawNotice(g, W, top, bottom, "Can't read the card", "Take it out and put it back in. The card should be FAT32. Then tap Check card.", C_YELLOW); break;
+    case CARD_NOFOLDER: end = drawNotice(g, W, top, bottom, "No POCKET folder", "The card has no folder named POCKET. Make one on a computer and copy .GMP games into it, then tap Check card.", C_YELLOW); break;
+    case CARD_READING: { char b[48]; snprintf(b, sizeof b, "Looking for games. Found so far: %d.", count); return drawNotice(g, W, top, bottom + 48, "Reading the card", b, C_WHITE); }
     default: return 0;
   }
+  Tile b = emptyButton(W);
+  drawButton(g, b.x, b.y, b.x + b.w, b.y + b.h, "Check card");
+  return end;
 }
 // Loading: the game's name, a bar. drawLoadingBar alone repaints the bar for the next step.
 template <class G> void drawLoadingBar(G& g, int W, int H, int step, int of) {

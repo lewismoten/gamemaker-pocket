@@ -2367,6 +2367,8 @@ void loop() {
           if(searchText[0]&&!nmatch){searchText[0]=0;drawPicker();}
           else if(selected>=0&&selected<ngames)openDetails();
         }
+      }else if(browsingCategories&&!category&&!searchText[0]&&!ngames&&cardState!=pk::CARD_READING&&pk::inEmptyButton(scr::W,tx,ty)) {
+        rescanCard();  // the empty-library notice's Check card button
       }else {
         int slot=pk::hitTile(scr::W,tx,ty),at=page*6+slot;
         if(slot>=0&&at<count){

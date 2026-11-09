@@ -1,6 +1,9 @@
 // Pocket Player install page (from Game-Maker: Sandbox Edition's flasher): tabs, and the Install buttons.
 // The button (ESP Web Tools, vendored in ewt/) is created on the pick, with that board's manifest.
-const MANIFESTS = { 35: 'manifest-35.json', 28: 'manifest-28.json' };
+const MANIFESTS = {
+  35: { courses: 'manifest-35-courses.json', player: 'manifest-35-player.json' },
+  28: { courses: 'manifest-28-courses.json', player: 'manifest-28-player.json' },
+};
 
 function mount(slot, manifest) {
   slot.replaceChildren();
@@ -19,16 +22,30 @@ function mount(slot, manifest) {
   slot.append(btn);
 }
 
+// The Install button shows only with a board picked and the box ticked; the variant (Player + Starter courses by default) picks the manifest.
 const installSlot = document.getElementById('install-slot');
-for (const r of document.querySelectorAll('input[name="board"]')) {
-  r.addEventListener('change', () => mount(installSlot, MANIFESTS[r.value]));
-  if (r.checked) mount(installSlot, MANIFESTS[r.value]);
+const installAck = document.getElementById('install-ack');
+function refreshInstall() {
+  const board = document.querySelector('input[name="board"]:checked');
+  const variant = document.querySelector('input[name="variant"]:checked');
+  installSlot.replaceChildren();
+  if (board && installAck.checked) {
+    mount(installSlot, MANIFESTS[board.value][variant ? variant.value : 'courses']);
+    return;
+  }
+  const p = document.createElement('p');
+  p.className = 'small';
+  p.textContent = board ? 'Tick the box to show the Install button.' : 'Pick a board and tick the box to show the Install button.';
+  installSlot.append(p);
 }
+for (const r of document.querySelectorAll('input[name="board"], input[name="variant"]')) r.addEventListener('change', refreshInstall);
+installAck.addEventListener('change', refreshInstall);
+refreshInstall();
 
 const otherSlot = document.getElementById('other-slot');
 const ack = document.getElementById('ack');
 ack.addEventListener('change', () => {
-  if (ack.checked) mount(otherSlot, MANIFESTS[28]);
+  if (ack.checked) mount(otherSlot, MANIFESTS[28].courses);
   else {
     otherSlot.replaceChildren();
     const p = document.createElement('p');

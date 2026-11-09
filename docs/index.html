@@ -84,6 +84,8 @@
       details { margin: 6px 0; }
       summary { cursor: pointer; padding: 4px 0; min-height: 24px; }
       label.ack { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; cursor: pointer; }
+      fieldset.variants { border: 0; padding: 0; margin: 12px 0 0; }
+      fieldset.variants legend { font-weight: 600; padding: 0; }
       label.ack input { width: 24px; height: 24px; flex: none; margin: 0; accent-color: #0a5a99; }
       footer { border-top: 1px solid var(--rule); padding: 10px 0 18px; font-size: 0.82rem; color: var(--muted); }
       footer p { margin: 0; }
@@ -141,7 +143,13 @@
               </div>
             </fieldset>
             <p class="small">The pictures are drawings, not photos. Another model? See the Other boards tab first.</p>
-            <div id="install-slot"><p class="small">Pick a board to show the Install button.</p></div>
+            <fieldset class="variants">
+              <legend>What to install</legend>
+              <label class="ack"><input type="radio" name="variant" value="courses" checked /> <span><strong>Player + Starter courses</strong> (recommended). The player and the 106 Starter games, ready to play.</span></label>
+              <label class="ack"><input type="radio" name="variant" value="player" /> <span><strong>Player only.</strong> No games on the board; you bring your own on a microSD card.</span></label>
+            </fieldset>
+            <label class="ack"><input type="checkbox" id="install-ack" /> <span>I understand this replaces the games and settings stored on the board (not the microSD card).</span></label>
+            <div id="install-slot" aria-live="polite"><p class="small">Pick a board and tick the box to show the Install button.</p></div>
             <h2>Steps</h2>
             <ol>
               <li>Desktop Chrome or Edge (Firefox, Safari and phones can't flash).</li>
@@ -150,12 +158,12 @@
               <li>If it can't connect, hold the BOOT button while plugging in or while clicking Connect.</li>
             </ol>
             <h2>What gets installed</h2>
-            <p class="small" id="what">The player's firmware and its library (the 106 Starter games). The install writes four parts of the 4 MB flash: bootloader, partition table, firmware, and the library's LittleFS area (the last 3 MB). It <strong>replaces the Starters and the controls settings</strong> (<code>settings.txt</code> lives in that area). It <strong>keeps</strong> the display setup, touch calibration and other saved values (the board's NVS area, which is not written; checked on a real board: unchanged byte for byte after an install), and it never touches the microSD card. Anything else that was in the 3 MB library area is gone, so back it up first if you stored your own files there.</p>
+            <p class="small" id="what">The player's firmware and, with <em>Player + Starter courses</em>, its library (the 106 Starter games). <em>Player only</em> leaves the library empty (just the player's font file), and the player then shows a screen that explains how to add games from a card. The install writes four parts of the 4 MB flash: bootloader, partition table, firmware, and the library's LittleFS area (the last 3 MB). It <strong>replaces the games stored on the board and the controls settings</strong> (<code>settings.txt</code> lives in that area). It <strong>keeps</strong> the display setup, touch calibration and other saved values (the board's NVS area, which is not written; checked on a real board: unchanged byte for byte after an install), and it never touches the microSD card. Anything else that was in the 3 MB library area is gone, so back it up first if you stored your own files there.</p>
           </div>
 
           <div role="tabpanel" id="p-games" aria-labelledby="tab-games" hidden>
             <h2>Adding games to a microSD card</h2>
-            <p class="small">The 106 Starters are already on the board. More games go on a card, one <code>.GMP</code> file each.</p>
+            <p class="small">The 106 Starters are already on the board if you chose Player + Starter courses. Games go on a card, one <code>.GMP</code> file each.</p>
             <ol>
               <li><strong>Get games.</strong> On the <a href="https://lewismoten.github.io/GameMaker-SandboxEdition/">Game-Maker: Sandbox Edition</a> site, open a game and choose Download, then <em>Pocket Player (microSD)</em>. It saves <code>NAME.GMP</code>.</li>
               <li><strong>Card.</strong> A microSD card formatted FAT32. Cards from 2 to 32 GB usually come that way; bigger cards usually come as exFAT, so reformat them as FAT32 first.</li>

@@ -148,7 +148,11 @@ prs::drawPressed(fb,g);prs::drawPressed(fb,n);assert(!fb.clipped);save(fb,out+"/
         pk::clearTiles(fb,W);libraryFrame(fb,W,fb.H,"Pocket Player",0,1,nullptr,false);
         drawCardChip(fb,W,k.s,k.cardGamesFound);
         if(k.flash) for(int i=0;i<6;i++)tileLabel(fb,W,i,labels[i],false,rootIcons[i]);
-        else assert(drawEmptyNotice(fb,W,k.s,k.cardGamesFound)>0&&drawEmptyNotice(fb,W,k.s,k.cardGamesFound)<=footerY);
+        else {
+          int end=drawEmptyNotice(fb,W,k.s,k.cardGamesFound);assert(end>0&&end<=footerY);
+          Tile eb=emptyButton(W);assert(eb.h>=44&&eb.w>=44&&eb.y+eb.h<=footerY&&eb.y>=40);  // a 44 pixel target above the page buttons
+          if(k.s!=CARD_READING){assert(end<=eb.y&&inEmptyButton(W,eb.x+eb.w/2,eb.y+eb.h/2)&&!inEmptyButton(W,eb.x+eb.w/2,eb.y-6));}
+        }
         assert(!fb.clipped);save(fb,out+"/card-"+k.name+"-"+std::to_string(W)+".ppm");
         // no back arrow on the root page: the top-left 32x32 is plain title bar
         for(int y=0;y<32;y++)assert(fb.px[y*W]!=C_WHITE);  // the arrow button's outline is not there
