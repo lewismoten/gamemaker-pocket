@@ -216,7 +216,13 @@ struct World {
     return f;
   }
 
-  int mapBlock(int x, int y) const { return map[y * MLEN + x]; }
+  // DOS wraps x,y by MLEN/MWID (PLAYBACK.C ADJBLOC); a cell above BACKBL is empty (DOS reads past blkmap).
+  int mapBlock(int x, int y) const {
+    x %= MLEN; if (x < 0) x += MLEN;
+    y %= MWID; if (y < 0) y += MWID;
+    int c = map[y * MLEN + x];
+    return c > BACKBL ? BACKBL : c;
+  }
   int shown(int b) const { return blkmap[b]; }
 
   // ---- keys (keys.ts) -----------------------------------------------------------------------
@@ -333,7 +339,7 @@ struct World {
   // DoBlockTouchChar. 0: refused (a counter is empty), 1: done, 2: done and an effect started.
   int doBlockTouchChar(const Attr& b) {
     bool snded = false;
-    if ((b.effect >= 20 || b.effect == 3) && meter[b.effect] + b.eamt <= 0) return 0;
+    if ((b.effect >= 20 || b.effect == 3) && b.effect < 30 && meter[b.effect] + b.eamt <= 0) return 0;
     if (cseq != DIESEQ) {
       if (b.chHitPt <= 0) hitpts = wrap16(hitpts + b.chHitPt);
       else if ((uint16_t)(hitpts + b.chHitPt) < INF_REPEAT) hitpts = wrap16(hitpts + b.chHitPt);
@@ -358,7 +364,7 @@ struct World {
       if (b.eamt > 0) snded = doSound(ADDLIFESOUND);
       lives = wrap16(lives + b.eamt);
     }
-    if (b.effect > 2 && meter[b.effect] != INF_REPEAT && b.effect < 30) {
+    if (b.effect > 2 && b.effect < 30 && meter[b.effect] != INF_REPEAT) {
       if (!snded) {
         if (b.effect == 3) {
           if (b.eamt > 0) snded = doSound(ADDMONEYSOUND);
@@ -1095,7 +1101,7 @@ struct World {
       int bx = xx / BLEN, wx = xx % BLEN;
       int n = BLEN - wx;
       if (x + n > SIZEX) n = SIZEX - x;
-      int b = blkmap[map[cellY * MLEN + (mx + bx) % MLEN]];
+      int b = blkmap[mapBlock((mx + bx) % MLEN, cellY)];
       const uint8_t* src = b < nbl ? bbl + b * BLOCK_BYTES + wy * BLEN + wx : nullptr;
       if (src) memcpy(out + x, src, n);
       else memset(out + x, 0, n);
