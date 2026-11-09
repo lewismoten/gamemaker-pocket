@@ -160,8 +160,12 @@ template<class G> void tileCaption(G&g,const Tile&r,int y,const char*title,int c
   if(*rest){char b[64];ellipsize(rest,b,sizeof b,(size_t)cols);clippedText(g,r,b,x,y+9*k2,k2,C_WHITE);}
 }
 // caption: a Starter's title (with its course number, 0 for none) drawn as text under the picture, which then sits at the top.
+// "On board": the game is kept in the board's own flash, not on the microSD card. A small black chip, bottom left of its tile.
+template<class G> void boardMark(G&g,const Tile&r) {
+  g.fillRect(r.x+1,r.y+r.h-11,8*6+4,10,C_BLACK);clippedText(g,r,"On board",r.x+3,r.y+r.h-10,1,C_YELLOW);
+}
 template<class G> void thumbnail(G&g,int W,int i,const uint8_t*raw,const char*dos,bool selected,bool panelOrder=false,bool pinned=false,
-                                 const char*caption=nullptr,int course=0,bool touch=false) {
+                                 const char*caption=nullptr,int course=0,bool touch=false,bool onBoard=false) {
   auto r=tile(W,i);g.fillRect(r.x,r.y,r.w,r.h,C_DARK);int y0=raw&&caption?r.y+1:r.y+(r.h-r.ph)/2;
   int shown=caption?r.ph*5/6:r.ph;  // a caption covers the picture's bottom sixth (a Starter's own "COURSE nnn" band)
   if(raw){uint16_t row[144];for(int y=0;y<shown;y++){
@@ -172,6 +176,7 @@ template<class G> void thumbnail(G&g,int W,int i,const uint8_t*raw,const char*do
   g.drawRect(r.x,r.y,r.w,r.h,selected?C_YELLOW:C_GRAY);
   if(pinned)starMark(g,W,i);
   if(touch)touchMark(g,r.x+r.w-18,r.y+r.h-18,panelOrder);
+  if(onBoard)boardMark(g,r);
 }
 // Details' footer: Back, the Favorite star (a toggle: outlined, or filled when the game is a favorite) and Play, in thirds.
 inline int detailsButton(int W,int x) {return x<W/3?0:x<2*W/3?1:2;}

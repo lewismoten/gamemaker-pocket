@@ -22,6 +22,16 @@ int main(int argc,char**argv) {
   assert(pk::cached(cache,100,123,"GAME.GMP"));assert(!pk::cached(cache,101,123,"GAME.GMP"));assert(!pk::cached(cache,100,124,"GAME.GMP"));assert(!pk::cached(cache,100,123,"OTHER.GMP"));
   cache.game.pos++;assert(!pk::cached(cache,100,123,"GAME.GMP"));
   assert(pk::crc32("123456789",9)==0xcbf43926);
+  {  // Games kept in the board's flash: listed by name like the card's, marked, and the card's copy wins over the board's.
+    assert(pk::gmpName("VIRUS.GMP")&&pk::gmpName("a-b_c1.gmp")&&!pk::gmpName(".GMP")&&!pk::gmpName("a b.GMP")&&!pk::gmpName("WAYTOOLONGNAME1.GMP")&&!pk::gmpName("GAME.ZIP"));
+    pk::Entry board={},card={};board.one=true;card.one=card.sd=true;
+    assert(pk::onBoard(board)&&!pk::onBoard(card));
+    assert(pk::sdBeatsBoard(card,board)&&!pk::sdBeatsBoard(board,card)&&!pk::sdBeatsBoard(card,card)&&!pk::sdBeatsBoard(board,board));
+    pk::Entry starter={};assert(!pk::onBoard(starter)&&!pk::sdBeatsBoard(card,starter));  // a Starter is not an on-board one-file game
+    static Phys fb;fb.W=320;fb.H=240;fb.clear();pk::clearTiles(fb,320);for(int i=0;i<2;i++)pk::thumbnail(fb,320,i,nullptr,"VIRUS BLASTER",false,false,false,nullptr,0,false,i==0);
+    auto r=pk::tile(320,0),r1=pk::tile(320,1);auto lit=[&](pk::Tile t){int n=0;for(int y=t.y+t.h-11;y<t.y+t.h;y++)for(int x=t.x;x<t.x+50;x++)if(fb.px[y*fb.W+x]==pk::C_YELLOW)n++;return n;};
+    assert(lit(r)>20&&lit(r1)==0);assert(!fb.clipped);
+  }
   {  // Hold to repeat (page arrows, Backspace): nothing until 400 ms, then every 125 ms; lifting after a repeat is no extra tap; sliding off stops it.
     prs::Press p;bool on=true;auto look=[&](int,int,prs::Rect&r){r=prs::Rect(0,0,48,32);return on;};
     assert(p.update(1000,true,10,10,look)==prs::PRESS);p.makeRepeatable();

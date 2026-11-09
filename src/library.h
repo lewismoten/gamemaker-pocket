@@ -21,6 +21,16 @@ struct Entry {
 };
 // Cache is disposable and separate from packages/personal data. Validate every row before reuse.
 inline uint32_t crc32(const void* data,size_t n) {uint32_t c=0xffffffff;const uint8_t*p=(const uint8_t*)data;while(n--){c^=*p++;for(int i=0;i<8;i++)c=(c>>1)^((c&1)?0xedb88320:0);}return c^0xffffffff;}
+// A one-file game kept in the board's own flash (LittleFS /games), not on the microSD card.
+inline bool onBoard(const Entry& g) {return g.one&&!g.sd;}
+// A .GMP file name this firmware lists: 4 to 15 characters, letters, digits, _ or -, then .gmp (either case).
+inline bool gmpName(const char* nm) {
+  size_t len=strlen(nm);if(len<=4||len>=16||strcasecmp(nm+len-4,".gmp"))return false;
+  for(size_t i=0;i<len-4;i++)if(!((nm[i]>='a'&&nm[i]<='z')||(nm[i]>='A'&&nm[i]<='Z')||(nm[i]>='0'&&nm[i]<='9')||nm[i]=='_'||nm[i]=='-'))return false;
+  return true;
+}
+// Two entries are one game (same uid): the microSD copy wins over the board's.
+inline bool sdBeatsBoard(const Entry& incoming,const Entry& kept) {return incoming.sd&&incoming.one&&onBoard(kept);}
 struct Cached { Entry game; uint32_t size, modified, checksum; };
 inline bool cached(const Cached&r,uint32_t size,uint32_t modified,const char*name) {
   return r.checksum==crc32(&r,offsetof(Cached,checksum))&&r.game.file[15]==0&&r.game.id[27]==0&&r.game.category<=6&&r.size==size&&r.modified==modified&&r.game.one&&r.game.sd&&!strcmp(r.game.file,name);

@@ -176,16 +176,16 @@ static uint8_t* readFileIn(fs::FS& fsys, const char* base, const char* name, siz
 // A file of the game being played: an entry of its .GMP for a one-file game, else a file of its folder.
 static uint8_t* readGameFile(const char* name, size_t* n) {
   if (!curOne[0]) return readFileIn(*curFs, curBase, name, n);
-  bool wasUp = sdUp;
-  if (!mountSD()) return nullptr;
+  bool card = curFs == &SD, wasUp = sdUp;  // a game kept in the board's flash needs no card
+  if (card && !mountSD()) return nullptr;
   File pf;
   gm::SmallPak pak;
   uint8_t* p = nullptr;
-  if (packOpen(SD, curOne, pf, pak)) {
+  if (packOpen(*curFs, curOne, pf, pak)) {
     p = packRead(pf, pak, name, n);
     pf.close();
   }
-  if (!wasUp) unmountSD();
+  if (card && !wasUp) unmountSD();
   return p;
 }
 // A game's .cfg is read line by line (a big game's is tens of KB: nothing holds it, and a level's record is found by reading it again).
@@ -200,7 +200,7 @@ static bool cfgInPak = false;
 static void* cfgOpen(void*, const char* name) {
   char path[48];
   cfgInPak = false;
-  if (curFs == &LittleFS && smallOpen(smallCfg, smallCfgPak)) {
+  if (curFs == &LittleFS && !curOne[0] && smallOpen(smallCfg, smallCfgPak)) {
     if (smallCfgLines.open(&smallCfgPak, name)) { cfgInPak = true; return &smallCfg; }
     smallCfg.close();
   }
@@ -211,7 +211,7 @@ static void* cfgOpen(void*, const char* name) {
     cfgMounted = true;
   }
   if (curOne[0]) {  // a one-file game: its .cfg is an entry of the .GMP
-    if (packOpen(SD, curOne, smallCfg, smallCfgPak)) {
+    if (packOpen(*curFs, curOne, smallCfg, smallCfgPak)) {
       if (smallCfgLines.open(&smallCfgPak, name)) { cfgInPak = true; return &smallCfg; }
       smallCfg.close();
     }
@@ -396,6 +396,7 @@ static void identify(GameEntry& g,const char* uid) { uint8_t hash[32];mbedtls_sh
 static bool gameMeta(const GameEntry&g,pk::Meta&m);
 static bool duplicate(const GameEntry& g) {
   for(int i=0;i<ngames;i++)if(!memcmp(games[i].uid,g.uid,16)) {
+    if(pk::sdBeatsBoard(g,games[i])){games[i]=g;return true;}  // the same game on the card and on the board: the card's copy is the one listed
     if(g.metadata&&games[i].metadata){pk::Meta a,b;if(gameMeta(g,a)&&gameMeta(games[i],b)&&(strcmp(a.uid,b.uid)||strcmp(a.crc,b.crc))){uidConflict=true;Serial.println("LIB conflicting UID: first installed copy retained");}}
     return true;
   }
@@ -416,7 +417,7 @@ static void classify(GameEntry& g,const pk::Meta& m) {
 static bool gameMeta(const GameEntry& g,pk::Meta& m) {
   bool was=sdUp;if(g.sd&&!mountSD())return false;
   File f;char path[48];char b[1025];bool ok=false;
-  if(g.one)snprintf(path,sizeof path,"/pocket/%s",g.file);
+  if(g.one)snprintf(path,sizeof path,"%s/%s",g.sd?"/pocket":"/games",g.file);
   else snprintf(path,sizeof path,"%s/%s",g.sd?"/pocket":"",g.metadata?"library.jsonl":"games.txt");
   f=(g.sd?(fs::FS&)SD:(fs::FS&)LittleFS).open(path,"r");
   if(f) {
@@ -469,6 +470,34 @@ static void addGames(fs::FS& fsys,const char* base,bool sd) {
     if(duplicate(g))continue;if(ngames==MAXGAMES){catalogOverflow=true;break;}games[ngames++]=g;
   }f.close();
 }
+// Reads a one-file game's catalog entry from its open .GMP (game.txt line, then library.json when it has one). sd: on the card, else in flash.
+static bool gmpEntry(File& f,const char* nm,bool sd,GameEntry& g) {
+  gm::SmallPak pak;pak.user=&f;pak.readAt=smallReadAt;pak.size=f.size();if(!pak.begin())return false;
+  uint32_t off,n;if(!pak.find("game.txt",&off,&n)||n>256)return false;
+  char b[1025];if(!smallReadAt(&f,off,b,n)||!pk::gmp1(b,n))return false;b[n]=0;
+  char*line=b+6;char*end=strchr(line,'\n');if(end)*end=0;
+  g={};strcpy(g.file,nm);
+  if(!parseGameLine(line,false,g))return false;
+  g.sd=sd;g.one=true;g.pos=off+6;g.len=end?end-line:n-6;g.category=5;
+  char uid[128];snprintf(uid,sizeof uid,"legacy:gmp:%s:%s",nm,g.id);identify(g,uid);
+  if(pak.find("library.json",&off,&n)&&n<=1024&&smallReadAt(&f,off,b,n)) {
+    b[n]=0;pk::Meta m;if(pk::metadata(b,n,m)){g.metadata=true;g.pos=off;g.len=n;identify(g,m.uid);classify(g,m);}
+  }
+  return true;
+}
+// The games kept in the board's flash: every NAME.GMP in LittleFS /games (nothing there is also fine).
+static void addBoardGames() {
+  File dir=LittleFS.open("/games");if(!dir||!dir.isDirectory()){dir.close();return;}
+  while(true) {
+    bool isDir=false;String path=dir.getNextFileName(&isDir);if(!path.length())break;
+    const char*nm=strrchr(path.c_str(),'/');nm=nm?nm+1:path.c_str();
+    if(isDir||!pk::gmpName(nm))continue;
+    char full[40];snprintf(full,sizeof full,"/games/%s",nm);File f=LittleFS.open(full,"r");if(!f)continue;
+    GameEntry g={};bool ok=gmpEntry(f,nm,false,g);f.close();
+    if(ok&&!duplicate(g)){if(ngames==MAXGAMES){catalogOverflow=true;break;}games[ngames++]=g;}
+  }
+  dir.close();
+}
 static bool scanCardBatch() {
   if(scanDone||!haveSD||!catalog)return false;
   if(!scanDir){if(!mountSD()){scanDone=true;cardState=pk::CARD_NONE;return true;}scanDir=SD.open("/pocket");if(!scanDir){scanDone=true;cardState=pk::CARD_NOFOLDER;stopCardScan();return true;}scanStart=millis();scanFiles=0;
@@ -483,17 +512,8 @@ static bool scanCardBatch() {
     bool safe=true;for(size_t i=0;i<len-4;i++)if(!pk::alnum(nm[i])&&nm[i]!='_'&&nm[i]!='-')safe=false;if(!safe)continue;
     File f=SD.open(path.c_str(),"r");if(!f)continue;
     GameEntry hit={};if(cachedGame(f,nm,hit)){cacheGame(hit,f);if(!duplicate(hit)){if(ngames==MAXGAMES){catalogOverflow=true;scanDone=true;}else games[ngames++]=hit;}f.close();if(scanDone)break;continue;}
-    gm::SmallPak pak;pak.user=&f;pak.readAt=smallReadAt;pak.size=f.size();if(!pak.begin()){f.close();continue;}
-    uint32_t off,n;if(!pak.find("game.txt",&off,&n)||n>256){f.close();continue;}
-    char b[1025];if(!smallReadAt(&f,off,b,n)||!pk::gmp1(b,n)){f.close();continue;}b[n]=0;
-    char*line=b+6;char*end=strchr(line,'\n');if(end)*end=0;
-    GameEntry g={};strcpy(g.file,nm);
-    if(parseGameLine(line,false,g)) {
-      g.sd=g.one=true;g.pos=off+6;g.len=end?end-line:n-6;g.category=5;
-      char uid[128];snprintf(uid,sizeof uid,"legacy:gmp:%s:%s",nm,g.id);identify(g,uid);
-      if(pak.find("library.json",&off,&n)&&n<=1024&&smallReadAt(&f,off,b,n)) {
-        b[n]=0;pk::Meta m;if(pk::metadata(b,n,m)){g.metadata=true;g.pos=off;g.len=n;identify(g,m.uid);classify(g,m);}
-      }
+    GameEntry g={};
+    if(gmpEntry(f,nm,true,g)) {
       cacheGame(g,f);
       if(!duplicate(g)){if(ngames==MAXGAMES){catalogOverflow=true;scanDone=true;}else games[ngames++]=g;}
     }f.close();if(scanDone)break;
@@ -546,6 +566,7 @@ static void loadGameList() {
   if(!catalog){catalogOverflow=true;scanDone=true;return;}
   listRead("recent",pk::RECENT_MAGIC,catalog->recent);listRead("pins",pk::PINS_MAGIC,catalog->pins);
   addGames(LittleFS,"",false);
+  addBoardGames();
   if(haveSD&&mountSD()){addGames(SD,"/pocket",true);scanDone=restoreCardCatalog();if(scanDone)cardState=pk::CARD_READY;unmountSD();}
 }
 static const char* fileOf(const GameEntry& g) { return g.sd && !g.one ? g.file : g.id; }  // the name of its .cfg (and .pak)
@@ -555,22 +576,23 @@ static bool selectGame(const GameEntry& game) {
   curOne[0] = 0;
   curPakBase = 0;
   if (game.one) {  // one file: the cards are its cards.pak entry
-    curFs = &SD;
-    strcpy(curBase, "/pocket");
-    snprintf(curOne, sizeof curOne, "/pocket/%s", game.file);
+    bool board = pk::onBoard(game);  // in the board's flash (LittleFS /games), else on the card (/pocket)
+    curFs = board ? (fs::FS*)&LittleFS : (fs::FS*)&SD;
+    strcpy(curBase, board ? "/games" : "/pocket");
+    snprintf(curOne, sizeof curOne, "%s/%s", curBase, game.file);
     strcpy(curPak, curOne);
     bool wasUp = sdUp, ok = false;
-    if (!mountSD()) return false;
+    if (!board && !mountSD()) return false;
     File pf;
     gm::SmallPak pak;
     uint32_t len = 0;
-    if (packOpen(SD, curOne, pf, pak)) {
+    if (packOpen(*curFs, curOne, pf, pak)) {
       uint32_t at, n;
       char header[6];
       ok = pak.find("game.txt", &at, &n) && n >= 6 && n <= 256 && smallReadAt(&pf, at, header, sizeof header) && pk::gmp1(header, sizeof header) && pak.find("cards.pak", &curPakBase, &len);
       pf.close();
     }
-    if (!wasUp) unmountSD();
+    if (!board && !wasUp) unmountSD();
     return ok;
   }
   if (game.sd) {
@@ -589,7 +611,8 @@ static bool selectGame(const GameEntry& game) {
 // mounted over a full heap, or mounted while the big blocks are placed, leaves no long free stretch for them.)
 static void prefetchLevel(int level) {
   clearPrefetched();
-  if (curFs != &SD) return;
+  if (curFs != &SD && !curOne[0]) return;  // a card game, or a one-file game in flash (same heap care, no card to mount)
+  bool card = curFs == &SD;
   // A level entered again (after a death) keeps its files; any other level: nothing of the last one stays, its record is read from the
   // card first, and the card is mounted for that with the heap at its emptiest. (Files the next level shares are read again; that
   // costs less than a mount over the buffers.)
@@ -600,8 +623,8 @@ static void prefetchLevel(int level) {
     assets.release();
     strcpy(assets.palName, keepPal);
   }
-  if (!mountSD()) return;
-  if (!same && !assets.readInfo(level)) { unmountSD(); return; }
+  if (card && !mountSD()) return;
+  if (!same && !assets.readInfo(level)) { if (card) unmountSD(); return; }
   const gm::LevelFiles& L = assets.files;
   bool mons = L.nmon > 0;
   const char* want[8];
@@ -624,7 +647,7 @@ static void prefetchLevel(int level) {
     pre[i].p = p;
     pre[i].n = len;
   }
-  unmountSD();
+  if (card) unmountSD();
 }
 // ---- settings ----------------------------------------------------------------------------------
 
@@ -1044,7 +1067,7 @@ static void categories() {
 }
 static uint8_t* preview(const GameEntry&g) {
   if(!g.metadata)return nullptr;
-  char path[48],name[32];snprintf(path,sizeof path,g.one?"/pocket/%s":g.sd?"/pocket/thumbs.pak":"/thumbs.pak",g.file);
+  char path[48],name[32];snprintf(path,sizeof path,g.one?(g.sd?"/pocket/%s":"/games/%s"):g.sd?"/pocket/thumbs.pak":"/thumbs.pak",g.file);
   snprintf(name,sizeof name,g.one?"thumb.pth":"%s.pth",g.id);
   File f;gm::SmallPak pak;uint32_t off,len;uint8_t*raw=nullptr;
   if(packOpen(g.sd?(fs::FS&)SD:(fs::FS&)LittleFS,path,f,pak)&&pak.find(name,&off,&len)&&len>=5&&len<=sizeof band) {
@@ -1067,7 +1090,7 @@ static void drawPicker(bool clear = true, bool paging = false) {
     if(browsingCategories){int c=categorySlots[at];
       if(!category&&c==CONTINUE_SLOT){int g=resumeGame();uint8_t*raw=nullptr;if(g>=0){if(games[g].sd&&haveSD)mountSD();raw=preview(games[g]);}pk::continueTile(tft,scr::W,r,raw,resumeRec.e.level,g<0,true);free(raw);}
       else pk::tileLabel(tft,scr::W,r,category?subLabel(category,c):rootLabel(c),false,tileIcon(category,c),true);}
-    else {int i=catalog->matches[at];pk::Meta m;gameMeta(games[i],m);uint8_t*raw=preview(games[i]);bool starter=games[i].category==1;pk::thumbnail(tft,scr::W,r,raw,m.title[0]?m.title:m.dos,i==selected,true,catalog->pins.has(games[i].uid),starter?m.title:nullptr,starter?m.course:0,games[i].scored&&games[i].score>=85);free(raw);}
+    else {int i=catalog->matches[at];pk::Meta m;gameMeta(games[i],m);uint8_t*raw=preview(games[i]);bool starter=games[i].category==1;pk::thumbnail(tft,scr::W,r,raw,m.title[0]?m.title:m.dos,i==selected,true,catalog->pins.has(games[i].uid),starter?m.title:nullptr,starter?m.course:0,games[i].scored&&games[i].score>=85,pk::onBoard(games[i]));free(raw);}
   }
   if(!was)unmountSD();
   if(!count&&searchText[0])pk::drawSmallIcon(tft,17,16,68,true);
