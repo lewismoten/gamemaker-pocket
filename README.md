@@ -1,5 +1,7 @@
 # Game-Maker Pocket
 
+![Game-Maker Pocket: DOS games in your pocket. The Sandbox Edition castle badge beside the title, and a 3.5-inch ESP32 touch board showing the game library.](docs/images/social-preview-640x320.png)
+
 A pocket player for [Game-Maker: Sandbox Edition](https://github.com/lewismoten/GameMaker-SandboxEdition) games, on cheap ESP32 touch-screen boards. It plays the Starter lessons from the games' real DOS files (packed small), a library of games from a microSD card, the PC speaker sounds, and has touch controls for fingers and a stylus, a settings screen and a status strip. It pairs with [gamemaker-os](https://github.com/lewismoten/gamemaker-os).
 
 Game-Maker: Sandbox Edition is a fork of RSD Game-Maker 3.0 (1991-1995), whose source was released under the MIT License in 2014. The play rules here (`src/gmcore.h`, `src/gmmon.h`) port that project's web engine, which follows the original `PLAYGAME.C`. See [NOTICE.md](NOTICE.md).
