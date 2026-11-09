@@ -485,16 +485,28 @@ static bool gmpEntry(File& f,const char* nm,bool sd,GameEntry& g) {
   }
   return true;
 }
-// The games kept in the board's flash: every NAME.GMP in LittleFS /games (nothing there is also fine).
+// The games kept in the board's flash: NAME.GMP files in LittleFS /games, nothing there is also fine. The ones named in
+// /games/ORDER.TXT (one file name per line) come first, in that order; the rest follow, in the file system's order.
+static void addBoardGame(const char* nm) {
+  if(!pk::gmpName(nm))return;
+  char full[40];snprintf(full,sizeof full,"/games/%s",nm);File f=LittleFS.open(full,"r");if(!f)return;
+  GameEntry g={};bool ok=gmpEntry(f,nm,false,g);f.close();
+  if(ok&&!duplicate(g)){if(ngames==MAXGAMES)catalogOverflow=true;else games[ngames++]=g;}
+}
 static void addBoardGames() {
+  File order=LittleFS.open("/games/ORDER.TXT","r");
+  if(order) {
+    while(order.available()) {
+      String line=order.readStringUntil('\n');line.trim();
+      if(line.length()&&line.length()<16)addBoardGame(line.c_str());
+    }
+    order.close();
+  }
   File dir=LittleFS.open("/games");if(!dir||!dir.isDirectory()){dir.close();return;}
   while(true) {
     bool isDir=false;String path=dir.getNextFileName(&isDir);if(!path.length())break;
     const char*nm=strrchr(path.c_str(),'/');nm=nm?nm+1:path.c_str();
-    if(isDir||!pk::gmpName(nm))continue;
-    char full[40];snprintf(full,sizeof full,"/games/%s",nm);File f=LittleFS.open(full,"r");if(!f)continue;
-    GameEntry g={};bool ok=gmpEntry(f,nm,false,g);f.close();
-    if(ok&&!duplicate(g)){if(ngames==MAXGAMES){catalogOverflow=true;break;}games[ngames++]=g;}
+    if(!isDir)addBoardGame(nm);  // a file listed in ORDER.TXT is skipped here: its uid is already in the list
   }
   dir.close();
 }

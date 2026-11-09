@@ -13,19 +13,20 @@ GAMES_DATA=$(mktemp -d "${TMPDIR:-/tmp}/pocket-games-data.XXXXXX")
 trap 'rm -rf "$PLAYER_DATA" "$GAMES_DATA"' EXIT
 cp data/font.bin "$PLAYER_DATA/"  # the only file the player itself needs; no Starter courses
 # The starter games are exported from a Game-Maker: Sandbox Edition checkout (GAMEMAKER_DIR, default ../GameMaker) with its
-# pocketData.ts exporter, Pocket-only (no DOS files). A file name's number keeps the list in this order (the board lists flash
-# files by name); the first is the one that must fit, so drop from the end if the image is ever too big.
-STARTER_GAMES="blaster:1-VIRUS snowbound:2-SNOWBOUND brief:3-BRIEF sandcast:4-SANDCAST remote:5-REMOTE"
+# pocketData.ts exporter, Pocket-only (no DOS files), under the exporter's own names so a card copy of the same game replaces
+# the board's. /games/ORDER.TXT keeps the list in this order; the first is the one that must fit, so drop from the end if the image is ever too big.
+STARTER_GAMES="blaster snowbound brief sandcast remote"
 GAMEMAKER_DIR=${GAMEMAKER_DIR:-"$(cd .. && pwd)/GameMaker"}
 mkdir -p "$GAMES_DATA/games"
 cp data/font.bin "$GAMES_DATA/"
 EXPORT=$(mktemp -d "${TMPDIR:-/tmp}/pocket-gmp.XXXXXX")
-ids=$(for g in $STARTER_GAMES; do printf '%s,' "${g%%:*}"; done); ids=${ids%,}
+ids=$(echo $STARTER_GAMES | tr ' ' ',')
 (cd "$GAMEMAKER_DIR/web" && npx vite-node scripts/pocketData.ts --gmp "$EXPORT" --no-dos --only "$ids" >/dev/null)
 for g in $STARTER_GAMES; do
-  f=$(ls "$EXPORT/pocket" | grep -i -m1 "^$(echo "${g%%:*}" | cut -c1-8)" || true)
-  [ -n "$f" ] || { echo "no .GMP exported for ${g%%:*}" >&2; exit 1; }
-  cp "$EXPORT/pocket/$f" "$GAMES_DATA/games/${g#*:}.GMP"
+  f=$(ls "$EXPORT/pocket" | grep -i -m1 "^$(echo "$g" | cut -c1-8)\\.GMP" || true)
+  [ -n "$f" ] || { echo "no .GMP exported for $g" >&2; exit 1; }
+  cp "$EXPORT/pocket/$f" "$GAMES_DATA/games/$f"
+  echo "$f" >> "$GAMES_DATA/games/ORDER.TXT"
 done
 rm -rf "$EXPORT"
 manifest() { # env, size label, kind (player|courses|games), output file
