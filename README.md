@@ -28,6 +28,10 @@ pio run -e esp32-3248s035                                                     # 
 
 Use a USB cable that carries data. If `pio` is not on your PATH it is at `~/.platformio/penv/bin/pio`. Each build bakes in its git hash and date; the serial command `FW` (115200 baud) prints them.
 
+## Updating the web flasher
+
+`docs/` is the GitHub Pages site (Settings, Pages, branch `main`, folder `/docs`): an install page where a visitor picks a board and flashes it from Chrome or Edge with the bundled [ESP Web Tools](docs/ewt/THIRD-PARTY.txt). After a firmware or `data/` change, run `scripts/build-pages.sh`. It builds both boards (`pio run`, then `-t buildfs` for the library image), copies bootloader, partitions, firmware and LittleFS images into `docs/fw/<env>/`, and rewrites `docs/manifest-28.json` and `docs/manifest-35.json` with the git hash and date as the version. Commit `docs/`; Pages serves the files as they are. Flash offsets: 0x1000 bootloader, 0x8000 partitions, 0x10000 firmware, 0x110000 LittleFS.
+
 ## Getting games onto it
 
 The 106 Starters in `data/` go into LittleFS with `uploadfs`. More games go on a FAT32 microSD card, in a `/pocket` folder, one `.GMP` file each. Game packs and the library index are made by Game-Maker: Sandbox Edition, not by this repository:
