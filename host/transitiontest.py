@@ -2,7 +2,7 @@
 """Compile the real board transition tail with panel/time stubs, not a copied guard.
 
 The hardware loop is not host-buildable; this narrowly exercises its failure branch.
-Run: python3 hardware/pocket-player/host/transitiontest.py
+Run: python3 host/transitiontest.py
 """
 from pathlib import Path
 import os

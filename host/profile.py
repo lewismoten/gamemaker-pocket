@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build and profile every indexed Pocket game/level; write raw samples and audited summaries.
 
-Usage: profile.py --data hardware/pocket-player/data --card CARD/pocket --out OUTPUT
+Usage: profile.py --data data --card CARD/pocket --out OUTPUT
 Outputs are private measurement artifacts, not source-controlled golden timings.
 """
 import argparse

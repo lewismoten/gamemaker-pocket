@@ -5,7 +5,7 @@ Art: made by Lewis Moten with ChatGPT's image generation (OpenAI); converted to 
 Stdlib only. Reads absolute M/L/H/V/Q/C/Z path data, applies the <g> transform (translate + scale), flattens the curves to
 polylines (adaptive: a curve splits until its control points are within FLAT canvas units of the chord), and writes per path
 its role, whether it is stroked and the points (whole units of the 1024 square), in draw order.
-Run:  python3 hardware/pocket-player/tools/svgHand.py     (rewrites src/handshape.h)
+Run:  python3 tools/svgHand.py     (rewrites src/handshape.h)
 """
 import re, os
 
