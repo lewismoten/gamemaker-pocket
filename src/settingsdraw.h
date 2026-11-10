@@ -121,6 +121,7 @@ struct View {
   Tab tab = T_CONTROLS;
   int page = 0;
   bool fromPause = false;
+  bool preview = false;  // 2.8 inch Controls: the live pad preview's own page
   Item last = I_NONE;  // the row changed last (its hint shows under the preview)
 };
 
@@ -152,8 +153,8 @@ struct Geo {
 };
 // The 2.8 inch board draws through sg::SoftGfx, whose text sizes are whole numbers: its sizes here are 1 or 2.
 #ifdef POCKET_CYD28
-// 36 px chips and tabs on 320 x 240 (Controls drops the preview there: its rows are name-beside-chips, four a page and a More row).
-constexpr Geo G = {40, 52, 36, 1.0f, 42, 41, 32, 40, 36, 1.0f, 1.0f, 156, 36, 1, 2, 202, 238, 160};
+// 36 px chips and tabs on 320 x 240 (Controls: name-beside-chips rows, four a page, a Preview button and More; the live pad is on its own Preview page).
+constexpr Geo G = {40, 52, 36, 1.0f, 42, 41, 32, 40, 36, 1.0f, 1.0f, 60, 44, 5, 8, 202, 238, 160};
 constexpr bool PREVIEW = false;
 #else
 // 40 px chips and tabs on 480 x 320; Controls keeps the live pad preview.
@@ -194,6 +195,7 @@ inline int perPage(Tab t) {  // as many rows as fit above the bottom edge
 inline int pages(Tab t) { Item it[12]; int n = tabItems(t, it), p = perPage(t); return (n + p - 1) / p; }
 // The items on the showing page.
 inline int pageItems(const View& v, Item* out) {
+  if (v.preview) return 0;
   Item it[12];
   int n = tabItems(v.tab, it), p = perPage(v.tab), k = 0;
   for (int i = v.page * p; i < n && k < p; i++) out[k++] = it[i];
@@ -224,11 +226,15 @@ inline Box chipBox(const Box& strip, int n, int k) {
   int w = (strip.x1 - strip.x0 - gap * (n - 1)) / n;
   return {strip.x0 + k * (w + gap), strip.y0, strip.x0 + k * (w + gap) + w, strip.y1};
 }
-inline Box previewBox() { return PREVIEW ? Box{G.pvX, G.pvY, G.pvX + pvW(), G.pvY + pvH()} : Box{0, 0, 0, 0}; }
+inline Box previewBox() { return Box{G.pvX, G.pvY, G.pvX + pvW(), G.pvY + pvH()}; }
+inline bool showsPreview(const View& v) { return v.tab == T_CONTROLS && (PREVIEW || v.preview); }
+// 2.8 inch: the Preview button (left of More) and, on the Preview page, the wide Back to options button
+inline Box previewBtn() { return {4, G.moreY0, W * 36 / 100 - 4, G.moreY1}; }
+inline Box optionsBtn() { return {4, G.moreY0, W - 4, G.moreY1}; }
 inline Box moreBox() { return PREVIEW ? Box{G.pvX, G.moreY0, G.pvX + pvW(), G.moreY1} : Box{W * 36 / 100, G.moreY0, W - 4, G.moreY1}; }
 
 // ---- what a touch is on ---------------------------------------------------------------------------------------------
-enum Kind : uint8_t { K_NONE, K_BACK, K_TAB, K_CHIP, K_MORE, K_PREVIEW };
+enum Kind : uint8_t { K_NONE, K_BACK, K_TAB, K_CHIP, K_MORE, K_PREVIEW, K_PVOPEN, K_PVBACK };
 struct Hit { Kind kind = K_NONE; int tab = 0; Item item = I_NONE; int chip = 0; Box box = {0, 0, 0, 0}; };
 inline Hit hit(const View& v, int x, int y) {
   Hit h;
@@ -236,7 +242,9 @@ inline Hit hit(const View& v, int x, int y) {
   for (int t = 0; t < T_COUNT; t++)
     if (tabBox(t).has(x, y)) { h.kind = K_TAB; h.tab = t; h.box = tabBox(t); return h; }
   if (v.tab == T_CONTROLS) {
-    if (PREVIEW && previewBox().has(x, y)) { h.kind = K_PREVIEW; h.box = previewBox(); return h; }
+    if (showsPreview(v) && previewBox().has(x, y)) { h.kind = K_PREVIEW; h.box = previewBox(); return h; }
+    if (!PREVIEW && v.preview) { if (optionsBtn().has(x, y)) { h.kind = K_PVBACK; h.box = optionsBtn(); } return h; }
+    if (!PREVIEW && previewBtn().has(x, y)) { h.kind = K_PVOPEN; h.box = previewBtn(); return h; }
     if (pages(v.tab) > 1 && moreBox().has(x, y)) { h.kind = K_MORE; h.box = moreBox(); return h; }
   }
   Item it[12];
@@ -367,17 +375,18 @@ template <class G_> void preview(G_& g, const ctl::Layout& L, const ctl::Need& n
 template <class G_> void previewNote(G_& g, const View& v, uint8_t held) {
   Box p = previewBox();
   const float sz = scr::SMALL ? 1.0f : 1.5f;
-  int y0 = p.y1 + 6, cols = (int)((p.x1 - p.x0) / (6 * sz));
-  g.fillRect(p.x0, y0, p.x1 - p.x0, G.moreY0 - 4 - y0, C_BLACK);
+  const int nx = PREVIEW ? p.x0 : 4, nw = PREVIEW ? p.x1 - p.x0 : W - 8, lines = PREVIEW ? 5 : 3;
+  int y0 = p.y1 + (PREVIEW ? 6 : 4), cols = (int)(nw / (6 * sz));
+  g.fillRect(nx, y0, nw, G.moreY0 - (PREVIEW ? 4 : 2) - y0, C_BLACK);
   char t[48];
   if (held) {
     heldText(held, t, sizeof t);
-    text(g, p.x0, y0, "Pressing:", sz, C_GRAY, C_BLACK);
-    wrapped(g, p.x0, y0 + (int)(8 * sz) + 4, t, cols, 2, sz, C_YELLOW);
+    text(g, nx, y0, "Pressing:", sz, C_GRAY, C_BLACK);
+    wrapped(g, nx, y0 + (int)(8 * sz) + 4, t, cols, 2, sz, C_YELLOW);
   } else if (v.last != I_NONE && info(v.last).hint[0]) {
-    wrapped(g, p.x0, y0, info(v.last).hint, cols, scr::SMALL ? 4 : 5, sz, C_WHITE);
+    wrapped(g, nx, y0, info(v.last).hint, cols, lines, sz, C_WHITE);
   } else {
-    wrapped(g, p.x0, y0, "Try the pad here: the parts you touch light up.", cols, 4, sz, C_GRAY);
+    wrapped(g, nx, y0, "Try the pad here: the parts you touch light up.", cols, lines - 1, sz, C_GRAY);
   }
 }
 template <class G_> void cardLines(G_& g, const CardInfo& c) {
@@ -402,11 +411,18 @@ template <class G_> void screen(G_& g, const View& v, const Values& vals, const 
   for (int k = 0; k < n; k++) row(g, v.tab, k, it[k], vals, it[k] == I_RESCAN && v.fromPause);
   if (v.tab == T_CARD) cardLines(g, card);
   if (v.tab == T_CONTROLS) {
-    if (PREVIEW) {
+    if (showsPreview(v)) {
       preview(g, L, nd, dirs, btn, vals.s.floatPad && !held && !dirs ? ctl::LOOK_OFF : ctl::LOOK_FULL);
       previewNote(g, v, held);
     }
-    if (pages(v.tab) > 1) {
+    if (!PREVIEW && v.preview) {
+      Box o = optionsBtn();
+      ovl::button(g, o.x0, o.y0, o.x1, o.y1, "Back to options", false, C_DARK, 1);
+    } else if (!PREVIEW) {
+      Box o = previewBtn();
+      ovl::button(g, o.x0, o.y0, o.x1, o.y1, "Preview", false, C_DARK, 1);
+    }
+    if (pages(v.tab) > 1 && !(v.preview && !PREVIEW)) {
       Box m = moreBox();
       char t[16];
       snprintf(t, sizeof t, "More %d/%d", v.page + 1, pages(v.tab));

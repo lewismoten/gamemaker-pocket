@@ -103,6 +103,13 @@ int main(int argc, char** argv) {
           if (st::hit(v, (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2).kind != st::K_PREVIEW) fail("the preview is not found");
           boxes.push_back(p);
         }
+        if (t == st::T_CONTROLS && !st::PREVIEW) {  // the Preview button opens the Preview page; it is 36 px and apart from More
+          st::Box pb = st::previewBtn();
+          if (pb.x1 - pb.x0 < 36 || pb.y1 - pb.y0 < 36 || pb.y1 > scr::H) fail("Preview button is small or off screen");
+          if (st::hit(v, (pb.x0 + pb.x1) / 2, (pb.y0 + pb.y1) / 2).kind != st::K_PVOPEN) fail("Preview button is not found");
+          if (overlap(pb, st::moreBox())) fail("Preview button overlaps More");
+          boxes.push_back(pb);
+        }
         if (t == st::T_CONTROLS && st::pages(v.tab) > 1) {
           st::Box m = st::moreBox();
           if (m.x1 - m.x0 < 36 || m.y1 - m.y0 < 36 || m.y1 > scr::H) fail("More is small or off screen");
@@ -156,6 +163,29 @@ int main(int argc, char** argv) {
     st::View v;
     ctl::Layout L = ctl::makeLayout(vals.s, demoNeed());
     v.last = st::I_DEAD;
+    v.preview = !st::PREVIEW;  // 2.8 inch: the pad is on the Preview page
+    if (!st::PREVIEW) {
+      st::Box p = st::previewBox(), ob = st::optionsBtn();
+      st::View o = v;
+      o.preview = false;
+      if (st::hit(o, (st::previewBtn().x0 + st::previewBtn().x1) / 2, st::previewBtn().y0 + 5).kind != st::K_PVOPEN) fail("Controls has no reachable Preview");
+      if (p.x0 < 0 || p.x1 > scr::W || p.y0 <= st::G.barH || p.y1 > st::G.moreY0 - 20) fail("Preview page: pad off screen or over the buttons");
+      if (ob.x1 - ob.x0 < 36 || ob.y1 - ob.y0 < 36 || ob.y1 > scr::H) fail("Back to options is small or off screen");
+      if (st::hit(v, (ob.x0 + ob.x1) / 2, (ob.y0 + ob.y1) / 2).kind != st::K_PVBACK) fail("Back to options is not found");
+      if (st::hit(v, (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2).kind != st::K_PREVIEW) fail("Preview page: the pad is not found");
+      if (st::pageItems(v, nullptr) != 0) fail("Preview page still lists rows");
+      if (overlap(p, ob) || overlap(p, st::backBox())) fail("Preview page overlaps");
+      Canvas c(scr::W, scr::H);
+      st::Values pv;
+      pv.s.lefty = 1;
+      st::screen(c, v, pv, st::CardInfo(), ctl::makeLayout(pv.s, demoNeed()), demoNeed(), 0, 0, 0);
+      st::View v0 = v;
+      v0.preview = false;
+      Canvas c0(scr::W, scr::H);
+      st::screen(c0, v0, pv, st::CardInfo(), ctl::makeLayout(pv.s, demoNeed()), demoNeed(), 0, 0, 0);
+      if (c.px == c0.px) fail("Preview page draws the same as the options");
+      shot(dir, "settings-320-Controls-preview", v, vals);
+    }
     shot(dir, std::string("settings-") + wn + "-Controls-hint", v, vals);
     Lit lit = touchPreview(vals.s, L.pad.cx + L.pad.r * 45 / 100, L.pad.cy - L.pad.r * 45 / 100);
     if (!lit.held) fail("a touch on the preview's pad pressed nothing");

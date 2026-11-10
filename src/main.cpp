@@ -2616,16 +2616,18 @@ void loop() {
           else enterPicker();
           return;
         case st::K_TAB:
-          if (h.tab != setView.tab) { setView.tab = (st::Tab)h.tab; setView.page = 0; setView.last = st::I_NONE; }
+          if (h.tab != setView.tab) { setView.tab = (st::Tab)h.tab; setView.page = 0; setView.preview = false; setView.last = st::I_NONE; }
           drawSettings();
           if (setView.tab == st::T_CARD && !cardSpace[0]) measureCard();
           return;
+        case st::K_PVOPEN: setView.preview = true; setView.last = st::I_NONE; drawSettings(); return;
+        case st::K_PVBACK: setView.preview = false; drawSettings(); return;
         case st::K_MORE: setView.page = (setView.page + 1) % st::pages(setView.tab); drawSettings(); return;
         case st::K_CHIP: chooseSetting(h.item, h.chip); return;
         default: break;
       }
     }
-    if (setView.tab == st::T_CONTROLS) previewTouch(now);
+    if (st::showsPreview(setView)) previewTouch(now);
     static uint32_t infoT = 0;
     if (setView.tab == st::T_CARD && now - infoT > 100) { infoT = now; touchInfo(); }
     delay(5);
