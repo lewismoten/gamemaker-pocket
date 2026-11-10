@@ -23,6 +23,7 @@
 #include "gmsave.h"
 #include "gmhiscore.h"
 #include "gmmenu.h"
+#include "dosmenudraw.h"
 #include "serialfs.h"
 #include "screen.h"
 #include "picker_draw.h"
@@ -1285,6 +1286,7 @@ static void fadePalette(const uint8_t* from, const uint8_t* to, const uint8_t* p
   }
 }
 // GetKey / PauseTimeKey: a touch (or the time) moves on. gm::PAUSE_KEY waits for the touch alone.
+static void pollSerial();
 static void waitTap(int seconds) {
   if (seconds <= 0 || cardsDry) return;
   if (readingPages) seconds = gm::PAUSE_KEY;
@@ -1293,6 +1295,7 @@ static void waitTap(int seconds) {
   int tx, ty;
   for (;;) {
     uint32_t now = millis();
+    if (Serial.available()) pollSerial();  // a walk's made-up touch (I x y) arrives here
     pollTouch(now);
     if (freshTap(tx, ty)) break;
     if (seconds != gm::PAUSE_KEY && (int32_t)(now - end) >= 0) return;
@@ -1649,6 +1652,7 @@ static void restartLevel() {
 // game the way a tap does, runs it with no input (drawing too), prints one "ST" line, then returns to the list.
 
 static void pollSerial();
+static void pauseGame();
 #ifdef POCKET_CYD28
 // ---- the 2.8 inch board: touch calibration and the display driver --------------------------------------
 // Three taps (touchcal.h) on crosses at the top left, top right and bottom left; the calibration is kept in NVS.
@@ -1807,6 +1811,219 @@ static void selfTestOne(int g, int ticks, bool cards) {
   while(haveSD&&!scanDone) { scanCardBatch(); delay(1); }
 }
 
+// ---- PLAYGAME's own menu, the Top Ten and the name entry (DoGame, ShowHighScores, CheckHighScores) -------------------------------
+// A tap on a game's Play opens its menu the way DOS did: the title slides (a card game has them), then the menu picture with the
+// words Play, Read Instructions, Read Storyline, See Credits, See Highest Scores and Quit. Each word is a touch target where it is
+// drawn; the strip at the foot is Up, Down, Enter and Esc; the Close X is Esc. All of it is drawn into the 320 x 200 picture
+// (dosmenudraw.h) and pushed through the same bands as the cards.
+static bool ensureFont() {
+  if (!fontData) { size_t fn = 0; fontData = readFileIn(LittleFS, "", "font.bin", &fn); if (fontData && fn < 95 * 8) { free(fontData); fontData = nullptr; } }
+  return fontData != nullptr;
+}
+static void hiLoad(gm::HiTable& t) {
+  char path[24];
+  gameFilePath(path, sizeof path, "his");
+  uint8_t raw[gm::HIS_BYTES];
+  size_t n = 0;
+  File f = LittleFS.open(path, "r");
+  if (f) { n = f.read(raw, sizeof raw); f.close(); }
+  gm::hiParse(raw, n, t);
+}
+static void hiSave(const gm::HiTable& t) {
+  char path[24];
+  gameFilePath(path, sizeof path, "his");
+  uint8_t raw[gm::HIS_BYTES];
+  gm::hiSerialize(t, raw);
+  File f = LittleFS.open(path, "w");
+  if (f) { f.write(raw, sizeof raw); f.close(); }
+}
+// The menu's background: the game's menu picture (a `card m` line, scene 0 slot 2) or DrawDefaultScrn's boxes. Malloc'd PIC_BYTES.
+static uint8_t* menuBackground() {
+  gm::Card cards[4];
+  int n = gm::cardsOfFile(cfgLines, assets.cfgName, "m", cards, 4);
+  for (int i = 0; i < n; i++)
+    if (cards[i].kind == 'g' || cards[i].kind == 'p') { uint8_t* p = gm::loadCardPicture(assets, readPak, cards[i]); if (p) return p; }
+  uint8_t* p = (uint8_t*)malloc(gm::PIC_BYTES);
+  if (p) gm::defaultMenuScreen(p);
+  return p;
+}
+static void menuChrome(int choice) {  // the Close X and the key strip, over the picture
+  cx::draw(tft, scr::W);
+  for (int k = 0; k < gmmenu::K_COUNT; k++) { int x0, y0, x1, y1; gmmenu::keyRect(k, x0, y0, x1, y1); pk::drawActionButton(tft, x0, y0, x1, y1, gmmenu::keyLabel(k)); }
+  (void)choice;
+}
+// The Top Ten over `pic` (a background, or null for black), waiting for a touch; frees pic.
+static void showTopTen(uint8_t* pic, long latest) {
+  Serial.println("SCREEN topten");
+  gm::HiTable t;
+  hiLoad(t);
+  if (!pic) { pic = (uint8_t*)calloc(gm::PIC_BYTES, 1); if (pic) { pic[3] = 63; pic[4] = 10; pic[5] = 10; pic[6] = 10; pic[7] = 10; pic[8] = 63; } }
+  if (!pic || !ensureFont()) { free(pic); return; }
+  setPalette6(pic);
+  gm::drawTopTen(pic, fontData, t, latest);
+  pushPicture(pic + 768);
+  free(pic);
+  cx::draw(tft, scr::W);
+  readingPages = true;  // the only way out is a touch (the engine waits 30 seconds)
+  waitTap(30);
+  readingPages = false;
+}
+// CheckHighScores: when the score makes the Top Ten, a name entry on the Search keyboard (vowels green, Space, Del and Done blue), then
+// the table is saved. Returns the place (0: not in).
+static int highScoreEntry(long score) {
+  gm::HiTable t;
+  hiLoad(t);
+  int place = gm::hiInsert(t, score);
+  if (!place) return 0;
+  Serial.printf("SCREEN name place %d score %ld\n", place, score);
+  char name[gm::HIS_NAME_MAX + 1] = "";
+  const int titleH = pk::searchTitleH(scr::W), top = titleH + 26, step = (scr::H - top - 38) / 4;
+  tft.fillScreen(C_BLACK);
+  pk::drawKeyboard(tft, scr::W, scr::H, titleH, name, "Type your name");
+  char head[40];
+  snprintf(head, sizeof head, scr::SMALL ? "Top Ten! Number %d" : "Congratulations! You are number %d", place);
+  tft.fillRect(0, 0, scr::W, titleH, C_BLACK);
+  tft.setTextSize(2);
+  tft.setTextColor(pk::C_YELLOW, C_BLACK);
+  tft.setCursor(8, (titleH - 16) / 2);
+  tft.print(head);
+  wasDown = true;
+  bool done = false;
+  while (!done) {
+    uint32_t now = millis();
+    if (Serial.available()) pollSerial();
+    pollTouch(now);
+    int tx, ty;
+    if (freshTap(tx, ty)) {
+      char previous[sizeof name];
+      memcpy(previous, name, sizeof name);
+      int n = strlen(name);
+      if (ty >= scr::H - 36) {
+        int b = pk::keyboardAction(scr::W, tx);
+        if (b == 0 && n < gm::HIS_NAME_MAX) { name[n] = ' '; name[n + 1] = 0; }
+        if (b == 1 && n) name[n - 1] = 0;
+        if (b == 2) done = true;
+      } else if (ty >= top && ty < top + 4 * step && n < gm::HIS_NAME_MAX) {
+        name[n] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[(ty - top) / step * 9 + tx * 9 / scr::W];
+        name[n + 1] = 0;
+      }
+      pk::drawSearchText(tft, titleH, name, previous, "Type your name");
+      Serial.printf("NAME \"%s\"\n", name);
+    }
+    delay(5);
+  }
+  gm::hiSetName(t, place, name);
+  hiSave(t);
+  return place;
+}
+// The game's menu. intro: show the title slides first. True: a game is playing (mode PLAYING); false: back to the library.
+static bool dosMenu(int g, bool intro) {
+  char name[96];
+  gameName(games[g], name, sizeof name);
+  activeGame = games[g];
+  curGame = g;
+  if (!selectGame(activeGame)) { startFailed(false); showFailCard(name); return false; }
+  snprintf(assets.cfgName, sizeof assets.cfgName, "%s.cfg", fileOf(activeGame));
+  assets.inflate = inflateRaw;
+  int mask = gm::menuPagesOfFile(cfgLines, assets.cfgName);
+  releaseCatalog();
+  assets.release();
+  bool card = curFs == &SD;
+  if (card) mountSD();
+  uint8_t black[768];
+  memset(black, 0, sizeof black);
+  if (intro && (mask & 1)) { tft.fillScreen(C_BLACK); showCards("t"); }
+  int choice = gmmenu::M_PLAY;
+  bool first = true;
+  uint8_t under[gmmenu::M_COUNT][gm::MARK_W * gm::MARK_H];
+  for (;;) {
+    uint8_t* pic = menuBackground();
+    if (!pic || !ensureFont()) { free(pic); break; }
+    gm::menuUnder(pic + 768, under);
+    gm::drawGameMenu(pic, fontData, name);
+    int blue = gm::dosBlue(pic);
+    gm::drawMenuMarker(pic + 768, choice, true, blue, under);
+    setPalette6(pic);
+    Serial.println("SCREEN dosmenu");
+    if (first) { carddraw::clear(tft, pal[0]); fadePalette(black, pic, pic + 768); first = false; }
+    else pushPicture(pic + 768);
+    menuChrome(choice);
+    wasDown = true;
+    int act = 0;  // 0: wait; else the choice taken (Esc and the X: Quit)
+    while (!act) {
+      uint32_t now = millis();
+      if (Serial.available()) pollSerial();
+      pollTouch(now);
+      int tx, ty, was = choice;
+      if (freshTap(tx, ty)) {
+        int k = gmmenu::keyHit(tx, ty), r = gmmenu::rowHit(tx, ty);
+        Serial.printf("MENU tap %d %d key %d row %d\n", tx, ty, k, r);
+        if (cx::hit(scr::W, tx, ty) || k == gmmenu::K_ESC) act = gmmenu::M_QUIT;
+        else if (k == gmmenu::K_ENTER) act = choice;
+        else if (k == gmmenu::K_UP) choice = gmmenu::step(choice, -1);
+        else if (k == gmmenu::K_DOWN) choice = gmmenu::step(choice, 1);
+        else if (r) { choice = r; act = r; }
+      }
+      if (choice != was) {  // GVertMenu: the old marker's pixels come back, the new one is drawn
+        gm::drawMenuMarker(pic + 768, was, false, blue, under);
+        gm::drawMenuMarker(pic + 768, choice, true, blue, under);
+        for (int c : {was, choice}) carddraw::pushTextRect(tft, pic + 768, pal, band, BAND, gm::markerRect(c));
+        Serial.printf("MENU choice %d\n", choice);
+      }
+      delay(5);
+    }
+    free(pic);
+    choice = act;
+    if (act == gmmenu::M_PLAY) {
+      if (card) unmountSD();
+      loadGameList();
+      selected = pk::selection(games, ngames, activeGame.uid);
+      if (selected < 0) return false;
+      return launchGame(selected);
+    }
+    if (act == gmmenu::M_QUIT) break;
+    if (act == gmmenu::M_INSTRUCTIONS || act == gmmenu::M_STORY) {
+      bool have = mask & (act == gmmenu::M_STORY ? 2 : 4);
+      if (have) { tft.fillScreen(C_BLACK); readingPages = true; showCards(act == gmmenu::M_STORY ? "s" : "h"); readingPages = false; }
+      else {
+        uint8_t* p2 = menuBackground();
+        if (p2) {
+          setPalette6(p2);
+          gm::dosWrite(p2 + 768, fontData, 40, 80, gm::dosRed(p2), act == gmmenu::M_STORY ? "No game-specific storyline." : "No game-specific instructions.");
+          pushPicture(p2 + 768);
+          free(p2);
+          waitTap(10);
+        }
+      }
+    } else if (act == gmmenu::M_CREDITS) {  // the credits picture (slot 7) is not packed: PLAYGAME's own line for a game without one
+      uint8_t* p2 = menuBackground();
+      if (p2) {
+        setPalette6(p2);
+        gm::dosWrite(p2 + 768, fontData, 40, 80, gm::dosRed(p2), "No game-specific credits given.");
+        pushPicture(p2 + 768);
+        free(p2);
+        waitTap(10);
+      }
+    } else if (act == gmmenu::M_SCORES) {
+      showTopTen(menuBackground(), -1);
+    }
+    spk::stop();
+  }
+  if (card) unmountSD();
+  loadGameList();
+  selected = pk::selection(games, ngames, activeGame.uid);
+  return false;
+}
+// The game is over (won, or every life lost): the Top Ten name entry if the score is in, the table, then the menu again.
+// True: the player chose Play again and the game is playing.
+static bool gameOverScores(long score) {
+  loadGameList();  // the catalog is let go while a game plays: the menu needs it for the title
+  int g = pk::selection(games, ngames, activeGame.uid);
+  highScoreEntry(score);
+  if (g < 0) return false;
+  showTopTen(nullptr, score);
+  return dosMenu(g, false);
+}
 static void serialCommand(const char* cmd) {
   char what[16], opt[8] = "";
   int ticks = 0;
@@ -2175,6 +2392,16 @@ static void pollSerial() {
         int g = atoi(buf + 2);
         if (g >= 0 && g < ngames && startGame(g)) wasDown = true;
         Serial.printf("G %d %s %s\n", g, g >= 0 && g < ngames ? activeGame.id : "?", mode == PLAYING ? "playing" : "failed");
+      } else if (buf[0] == 'D' && buf[1] == ' ' && mode == PICKER) {  // "D n": Details of game n (a walk's way in)
+        int g = atoi(buf + 2);
+        if (g >= 0 && g < ngames) { restoreSelection = false; selected = g; openDetails(); }
+      } else if (buf[0] == 'P' && mode == PLAYING) {  // "P": the pause menu (a walk's way to it)
+        pauseGame();
+      } else if (buf[0] == 'H' && buf[1] == 'S' && (mode == PLAYING || mode == PAUSED)) {  // "HS n": the game ends with score n (a walk's way to the Top Ten)
+        long sc = atol(buf + 3);
+        spk::stop(); world.releaseAll(); assets.release();
+        Serial.printf("HS %ld\n", sc);
+        if (gameOverScores(sc)) wasDown = true; else enterPicker();
       } else if (buf[0] == 'M' && buf[1] == ' ' && mode == PICKER) {  // "M n": what the list knows of game n and whether its tile can be drawn
         int g = atoi(buf + 2);
         if (g >= 0 && g < ngames) {
@@ -2634,7 +2861,7 @@ void loop() {
       if(ty<pk::header(scr::W)){if(cx::hit(scr::W,tx,ty)){mode=PICKER;drawPicker();}}  // the Close X: Details' old Back
       else if(k>=0)readMenuPages(k);
       else if(b==1){int r=toggleFavorite(games[selected].uid);drawDetails();pk::detailsNote(tft,scr::W,scr::H,pinMessage(r));}
-      else{if(!launchGame(selected))enterPicker();else wasDown=true;}}delay(5);return;
+      else{if(!dosMenu(selected,true))enterPicker();else wasDown=true;}}delay(5);return;
   }
   if (mode == SEARCH_SCREEN) {
     static bool bkOn = false;
@@ -2782,17 +3009,19 @@ void loop() {
       fadeLevelOut();
       assets.release();  // the level's big buffers go while a card shows (the next level loads them again); a card needs a 64 KB block
       if (r == 'W') {
+        long score = world.score;
         resumeClear();
         levelWhere(where, 'x', from);
         showCards(where);
         showCards("w");
-        enterPicker();
+        if (gameOverScores(score)) wasDown = true; else enterPicker();
         return;
       }
       if (lost) {
+        long score = world.score;
         resumeClear();
         showCards("l");
-        enterPicker();
+        if (gameOverScores(score)) wasDown = true; else enterPicker();
         return;
       }
       if (r == 'L') {

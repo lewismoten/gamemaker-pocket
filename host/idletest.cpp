@@ -173,6 +173,14 @@ int main() {
       assert(a.tap(ovl::PA_RESUME, 100) == ovl::ARM_ACT && a.tap(ovl::PA_QUIT, 100, false) == ovl::ARM_ACT && a.tap(-1, 100) == ovl::ARM_NONE);
       assert(a.tap(ovl::PA_QUIT, 100) == ovl::ARM_ARMED && a.tap(ovl::PA_QUIT, 200) == ovl::ARM_ACT);  // Confirm Quit: two taps
       assert(!strncmp(ovl::pauseLabel(ovl::PA_QUIT, true, ovl::PAUSE.colW, ovl::PAUSE.textSize), "Tap", 3));
+      {  // Save game writes at once unless a saved game would be written over; Load game asks (Confirm) and has nothing to load without a save
+        ovl::PauseArm b;
+        assert(b.tap(ovl::PA_SAVE, 100, true, false) == ovl::ARM_ACT);
+        assert(b.tap(ovl::PA_SAVE, 100, true, true) == ovl::ARM_ARMED && b.tap(ovl::PA_SAVE, 200, true, true) == ovl::ARM_ACT);
+        assert(b.tap(ovl::PA_SAVE, 100, false, true) == ovl::ARM_ACT && b.tap(ovl::PA_LOAD, 100, false, true) == ovl::ARM_ACT);
+        assert(b.tap(ovl::PA_LOAD, 100, true, true) == ovl::ARM_ARMED && b.tap(ovl::PA_LOAD, 200, true, true) == ovl::ARM_ACT);
+        assert(b.tap(ovl::PA_LOAD, 100, true, false) == ovl::ARM_NONE);
+      }
       for (int r : {ovl::PA_RESTART_LEVEL, ovl::PA_RESTART_GAME}) {
         assert(a.tap(r, 1000) == ovl::ARM_ARMED && a.armed == r);
         assert(!a.expire(4000) && a.expire(4001) && a.armed == -1);  // 3 seconds, then it is plain again

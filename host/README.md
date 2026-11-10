@@ -132,3 +132,7 @@ software renders; finger accuracy and panel appearance still need hardware check
 outlines every touch rectangle (a color per action) at 2x. Build it against two source trees to compare commits, for example
 `git archive <old> src | tar -x -C /tmp/old`, then `c++ -std=c++17 -O1 -DHIT_BEFORE -I/tmp/old/src -Ihost host/hitshots.cpp -lz -o hb`
 (`HIT_BEFORE` is only for the pre-7a5833a search keyboard) and `./hb out before`; add `-DPOCKET_CYD28` for the 2.8 inch board.
+
+## Saved games, Top Ten, game menu
+
+`gamesavetest.cpp` round-trips a save (src/gmsave.h), inserts into the Top Ten (src/gmhiscore.h) and checks the menu's touch map (src/gmmenu.h); `dosmenushots.cpp <data dir> <out dir>` renders the menu, Top Ten and name entry. Build each with `c++ -std=c++17 -O1 -Isrc host/<file>.cpp -lz` (add `-DPOCKET_CYD28` for 320 x 240).

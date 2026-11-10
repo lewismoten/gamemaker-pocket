@@ -76,9 +76,8 @@ template <class G> void drawPageRow(G& tft, const char* text, bool sd, int W, in
 // Empty, the field shows "Type a title" in gray as a hint (four pixels in, so the white caret sits clear of it); the caret is
 // always where the next character will appear.
 constexpr int SEARCH_HINT_SHIFT = 4;
-template <class G> void drawSearchText(G& tft, int titleH, const char* text, const char* previous = nullptr) {
+template <class G> void drawSearchText(G& tft, int titleH, const char* text, const char* previous = nullptr, const char* hint = "Type a title") {
   if (previous && !strcmp(text, previous)) return;
-  const char* hint = "Type a title";
   bool hintNew = !text[0], hintOld = !(previous && previous[0]);
   size_t prefix = 0;
   if (previous && text[0] && previous[0])
@@ -107,9 +106,9 @@ template <class G> void drawSearchHeader(G& tft, int W, bool all) {
   drawButton(tft, SEARCH_SCOPE_X0, cx::INSET, searchScopeX1(W), searchTitleH(W), all ? "All games" : "This category");
   cx::draw(tft, W);
 }
-template <class G> void drawKeyboard(G& tft, int W, int H, int titleH, const char* text) {
+template <class G> void drawKeyboard(G& tft, int W, int H, int titleH, const char* text, const char* hint = "Type a title") {
   tft.fillRect(0,0,W,H,C_BLACK);
-  drawSearchText(tft, titleH, text);
+  drawSearchText(tft, titleH, text, nullptr, hint);
   const char* keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   int top = titleH + 26, step = (H - top - 38) / 4;
   for (int i = 0; i < 36; i++)

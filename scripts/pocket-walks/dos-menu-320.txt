@@ -1,0 +1,55 @@
+# DOS menu, Pause Save/Load, Top Ten name entry (320x240). Board at the library, first run done.
+send D 0
+expect SCREEN details
+tap 240 210
+expect SCREEN dosmenu
+tap 120 226
+expect MENU choice 2
+tap 40 226
+expect MENU choice 1
+tap 120 140
+expect row 3
+wait 2500
+tap 200 100
+wait 1500
+tap 200 100
+wait 1500
+tap 200 100
+wait 1500
+expect SCREEN dosmenu
+tap 120 124
+expect MENU tap
+wait 6000
+send P
+expect SCREEN pause
+tap 84 108
+expect SAVE ok
+tap 84 108
+wait 300
+tap 84 108
+expect SAVE ok
+tap 84 155
+wait 300
+tap 84 155
+expect LOAD ok
+wait 2500
+send P
+expect SCREEN pause
+tap 84 61
+wait 1000
+send HS 5000
+expect SCREEN name
+tap 17 81
+wait 200
+tap 123 81
+wait 200
+tap 194 115
+wait 200
+expect NAME "ADO"
+tap 266 222
+expect SCREEN topten
+wait 800
+tap 160 100
+expect SCREEN dosmenu
+tap 120 164
+wait 1500
