@@ -1097,6 +1097,7 @@ static uint8_t* preview(const GameEntry&g) {
 }
 static void drawPicker(bool clear = true, bool paging = false) {
   (void)clear;(void)paging;
+  Serial.println("SCREEN picker");
   if(!catalog){assets.release();world.releaseAll();loadGameList();}
   uint32_t t=millis();if(restoreSelection)selected=pk::selection(games,ngames,activeGame.uid);filterGames();categories();int count=browsingCategories?categoryCount:nmatch,pages=(count+5)/6;page=pk::clampPage(page,count,haveSD&&!scanDone);
   pk::clearTiles(tft,scr::W);
@@ -1125,12 +1126,14 @@ static void drawPicker(bool clear = true, bool paging = false) {
   Serial.printf("LIB page ms=%lu catalog=%u free=%u largest=%u\n",(unsigned long)(millis()-t),(unsigned)sizeof(pk::Catalog),(unsigned)ESP.getFreeHeap(),(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
 static void drawSearch() {
+  Serial.println("SCREEN search");
   tft.fillScreen(C_BLACK);pk::drawKeyboard(tft,scr::W,scr::H,pk::searchTitleH(scr::W),searchText);
   pk::drawSearchHeader(tft,scr::W,searchAll);
   pk::drawSmallIcon(tft,searchAll?0:18,50,8,true);
 }
 static int detailsMask = 0;  // the selected game's own pages (picker.h detailsPageSpan), read from its .cfg when Details opens
 static void drawDetails() {
+  Serial.println("SCREEN details");
   pk::Meta m;gameMeta(games[selected],m);
   const auto& game=games[selected];
   const char* advisory=game.scored?(game.score>=85?"Plays well on touch":game.score<60&&game.quick?"Needs quick, exact jumps":nullptr):nullptr;
@@ -2580,12 +2583,12 @@ void loop() {
       if(ty<pk::searchTitleH(scr::W)){if(cx::hit(scr::W,tx,ty)){strcpy(searchText,savedSearch);searchAll=savedAll;browsingCategories=savedBrowsing;mode=PICKER;drawPicker();return;}if(tx>=pk::SEARCH_SCOPE_X0&&tx<pk::searchScopeX1(scr::W)){searchAll=!searchAll;drawSearch();}}
       else if(ty>=scr::H-36){int b=pk::keyboardAction(scr::W,tx);if(b==0&&n<24){searchText[n]=' ';searchText[n+1]=0;}if(b==1&&n){searchText[n-1]=0;bkOn=true;bkNext=now+prs::REPEAT_DELAY_MS;}if(b==2){page=0;selected=-1;browsingCategories=false;mode=PICKER;drawPicker();return;}}
       else if(ty>=top&&ty<top+4*step&&n<24){searchText[n]="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[(ty-top)/step*9+tx*9/scr::W];searchText[n+1]=0;}
-      pk::drawSearchText(tft,pk::searchTitleH(scr::W),searchText,previous);
+      pk::drawSearchText(tft,pk::searchTitleH(scr::W),searchText,previous);Serial.printf("SEARCH \"%s\"\n",searchText);
     }else if(bkOn){  // Backspace held: it repeats (400 ms, then 8 a second) while the finger stays on it
       int n=strlen(searchText);
       if(pts.n==0||pts.y[0]<scr::H-36||pk::keyboardAction(scr::W,pts.x[0])!=1)bkOn=false;
       else if(now>=bkNext&&n){char previous[sizeof searchText];memcpy(previous,searchText,sizeof previous);searchText[n-1]=0;
-        bkNext=now-bkNext>prs::REPEAT_EVERY_MS?now+prs::REPEAT_EVERY_MS:bkNext+prs::REPEAT_EVERY_MS;pk::drawSearchText(tft,pk::searchTitleH(scr::W),searchText,previous);}
+        bkNext=now-bkNext>prs::REPEAT_EVERY_MS?now+prs::REPEAT_EVERY_MS:bkNext+prs::REPEAT_EVERY_MS;pk::drawSearchText(tft,pk::searchTitleH(scr::W),searchText,previous);Serial.printf("SEARCH \"%s\"\n",searchText);}
     }delay(5);return;
   }
 #ifdef POCKET_CYD28
