@@ -51,11 +51,12 @@ inline bool parseLevelLine(const char* line, LevelFiles* L, Level* V) {
     return false;
   if (L) {
     strcpy(L->map, m); strcpy(L->bbl, bb); strcpy(L->cbl, cb); strcpy(L->chr, ch); strcpy(L->pal, pl);
-    L->nbl = g;
+    auto clampTo = [](int v, int hi) { return v < 0 ? 0 : v > hi ? hi : v; };  // counts come from a file anyone can make: keep them in what the engine can index
+    L->nbl = clampTo(g, BACKBL);
     bool withMons = nm > 0 && nb > 0;
     strcpy(L->mon, withMons ? mo : ""); strcpy(L->mbl, withMons ? mb : "");
-    L->nmon = withMons ? nm : 0;
-    L->nmbl = withMons ? nb : 0;
+    L->nmon = withMons ? clampTo(nm, LASTMON) : 0;
+    L->nmbl = withMons ? clampTo(nb, MONBL) : 0;
   }
   if (V) {
     V->startX = a; V->startY = b;
@@ -188,14 +189,14 @@ struct Assets {
     *n = len;
     return out;
   }
-  static bool swap(uint8_t*& slot, char* have, const char* want, size_t min, const Assets& a) {
+  static bool swap(uint8_t*& slot, char* have, const char* want, uint64_t min, const Assets& a) {
     if (slot && !strcmp(have, want)) return true;
     free(slot);
     slot = nullptr;
     have[0] = 0;
     size_t n = 0;
     slot = a.readz(want, &n);
-    if (!slot || n < min) { free(slot); slot = nullptr; return false; }
+    if (!slot || (uint64_t)n < min) { free(slot); slot = nullptr; return false; }
     strcpy(have, want);
     return true;
   }
@@ -248,9 +249,9 @@ struct Assets {
       free(m);
       if (!ok) return false;
     }
-    if (!swap(a.bbl, a.bblName, L.bbl, (size_t)L.nbl * BLOCK_BYTES, a) ||
-        (mons_ && !swap(a.mbl, a.mblName, L.mbl, (size_t)L.nmbl * BLOCK_BYTES, a)) ||
-        !swap(a.cbl, a.cblName, L.cbl, (size_t)L.ncbl * BLOCK_BYTES, a) ||
+    if (!swap(a.bbl, a.bblName, L.bbl, (uint64_t)L.nbl * BLOCK_BYTES, a) ||
+        (mons_ && !swap(a.mbl, a.mblName, L.mbl, (uint64_t)L.nmbl * BLOCK_BYTES, a)) ||
+        !swap(a.cbl, a.cblName, L.cbl, (uint64_t)L.ncbl * BLOCK_BYTES, a) ||
         !swap(a.chr, a.chrName, L.chr, 3784, a))
       return false;
     if (strcmp(a.palName, L.pal)) {
@@ -264,13 +265,13 @@ struct Assets {
     }
     a.w->bbl = a.bbl; a.w->cbl = a.cbl; a.w->chr = a.chr; a.w->nbl = L.nbl;
     if (mons_) {
-      if (!swap(a.mon, a.monName, L.mon, (size_t)L.nmon * MONSTER_BYTES, a)) return false;
+      if (!swap(a.mon, a.monName, L.mon, (uint64_t)L.nmon * MONSTER_BYTES, a)) return false;
     } else {
       free(a.mon); free(a.mbl);
       a.mon = a.mbl = nullptr;
       a.monName[0] = a.mblName[0] = 0;
     }
-    if (L.snd[0] && swap(a.snd, a.sndName, L.snd, (size_t)LASTSND * 72, a)) a.w->snd = a.snd;
+    if (L.snd[0] && swap(a.snd, a.sndName, L.snd, (uint64_t)LASTSND * 72, a)) a.w->snd = a.snd;
     else {
       free(a.snd);
       a.snd = nullptr;
