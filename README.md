@@ -59,7 +59,13 @@ Python 3 with `pyserial` (PlatformIO's Python has it: `~/.platformio/penv/bin/py
 
 ## Host tests
 
-The play loop, cards, controls and setup flow have no board code and are tested on the Mac with a C++17 compiler and zlib: `host/*.cpp` (see [host/README.md](host/README.md); for example `c++ -std=c++17 -O1 -Isrc host/controlstest.cpp -lz && ./a.out`). Some of those tests are run by scripts in Game-Maker: Sandbox Edition that compare them with the real engine.
+Run every repository-local host check with:
+
+```sh
+python3 tools/run_host_tests.py
+```
+
+Needs Python 3, `c++` with C++17 and AddressSanitizer/UndefinedBehaviorSanitizer, zlib development headers/library, and Node.js with Web Streams. No board is needed. The runner builds all `host/*.cpp`, runs both board sizes where applicable, checks all 106 bundled games, and runs the Python and Node regressions. It prints PASS/FAIL/SKIP per test and a summary, exits nonzero on any failure, and prints the temporary directory holding commands, logs and renders. External game data and engine comparisons are reported as SKIP. See [host/README.md](host/README.md) for coverage, arguments and limitations.
 
 ## License
 

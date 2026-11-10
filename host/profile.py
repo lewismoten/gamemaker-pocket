@@ -34,6 +34,8 @@ def main():
         parser.error("samples/repeats outside bounded range")
     args.out.mkdir(parents=True, exist_ok=True)
     if args.cpu is not None:
+        if not hasattr(os, "sched_setaffinity"):
+            parser.error("--cpu requires a platform with sched_setaffinity (Linux)")
         os.sched_setaffinity(0, {args.cpu})
     host = Path(__file__).resolve().parent
     src = host.parent / "src"
@@ -51,7 +53,7 @@ def main():
     assert len({g["id"] for g in inventory}) == len(inventory), "duplicate game id"
     assert len(inventory) == args.expected_games, (len(inventory), args.expected_games)
     (args.out / "inventory.json").write_text(json.dumps(inventory, indent=2) + "\n")
-    env = dict(started=datetime.now(timezone.utc).isoformat(), platform=platform.platform(), machine=platform.machine(), python=platform.python_version(), compiler=subprocess.check_output(["c++", "--version"], text=True).splitlines()[0], build=command, affinity=sorted(os.sched_getaffinity(0)), load_start=os.getloadavg(), samples=args.samples, repeats=args.repeats, warmup=30, seed=12345, revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=host, text=True).strip(), source_sha256=hashlib.sha256((host / "frameprofile.cpp").read_bytes()).hexdigest())
+    env = dict(started=datetime.now(timezone.utc).isoformat(), platform=platform.platform(), machine=platform.machine(), python=platform.python_version(), compiler=subprocess.check_output(["c++", "--version"], text=True).splitlines()[0], build=command, affinity=sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None, load_start=os.getloadavg(), samples=args.samples, repeats=args.repeats, warmup=30, seed=12345, revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=host, text=True).strip(), source_sha256=hashlib.sha256((host / "frameprofile.cpp").read_bytes()).hexdigest())
     cpuinfo = Path("/proc/cpuinfo")
     env["cpu_model"] = next((x.split(":", 1)[1].strip() for x in cpuinfo.read_text().splitlines() if x.startswith("model name")), "unknown") if cpuinfo.exists() else "unknown"
     all_values, summary, failures = [], [], []

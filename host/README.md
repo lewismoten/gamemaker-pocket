@@ -4,6 +4,76 @@ These run on a desktop, without a board, SD controller, display, or serial conne
 They supplement `web/scripts/pocketHostCheck.ts` (walkthrough parity), not replace it.
 Use a C++17 compiler and zlib development headers, plus Python 3. Run from the repository root.
 
+## Run everything
+
+```sh
+python3 tools/run_host_tests.py
+```
+
+Also needs Node.js with Web Streams and a compiler with AddressSanitizer and
+UndefinedBehaviorSanitizer. The script resolves paths from its own location, so it
+can be invoked by absolute path from another directory. It discovers every
+`host/*.cpp`, `host/*.py` and `host/*.mjs` and fails if one lacks a recipe. A failed
+build, assertion, command, timeout, sanitizer report, card `ERR`, or sound timing
+failure makes the command exit nonzero; remaining test programs still run.
+Missing tools or committed `data/` files are failures, not skips.
+
+Each test prints PASS/FAIL; unavailable external checks print SKIP with a reason.
+The final line counts all three. All build products, exact commands, stdout/stderr,
+PNGs, PPMs and profiling reports stay in the printed `pocket-host-tests-*` temporary
+directory for inspection (remove it when finished). Nothing is flashed or written
+to game data. The every-level profiler uses its full defaults, so allow several
+minutes for the suite.
+
+Builds use the existing host recipes: `c++ -std=c++17 -O1 -Wall -Wextra -Isrc`,
+linked with `-lz`. `coretest`, `sdfaulttest` and `hostpaktest` additionally use
+`-g -fsanitize=address,undefined -fno-omit-frame-pointer`; `hostpaktest` retains
+`-Wno-unused-function`. Undefined behavior stops the test immediately. The Python
+probes retain their own compiler commands. Assertions remain enabled.
+
+| Programs | Runner arguments / coverage |
+| --- | --- |
+| `carddrawtest`, `controlstest`, `idletest`, `setuptest` | No arguments; default 3.5 inch build and `-DPOCKET_CYD28` 2.8 inch build |
+| `firstruntest`, `settingstest` | Separate output directory for each board build |
+| `paddrawtest` | Output PPM filename for each board build |
+| `coretest`, `serialfstest`, `touchcaltest` | No arguments |
+| `hostpaktest` | Scratch directory for generated valid/malformed bundle fixtures |
+| `favoritestest`, `librarytest` | `data OUTPUT`; both widths exercised internally |
+| `storytest` | `data OUTPUT ID...`, all 106 indexed ids, both board builds |
+| `playshots` | `data OUTPUT first-steps around-the-room jump-boots`, both board builds |
+| `cardstest`, `heaptest` | `data ID`, separately for every indexed game |
+| `iconsdump` | `data ID 30`, separately for every indexed game (icon producer smoke check) |
+| `hosttest` | `data ID KEYS`, every indexed game; generated seed 12345, Right then Left, 180 ticks (smoke check, not engine parity) |
+| `sdfaulttest` | `data first-steps` and `data take-the-wheel` |
+| `frameprofile` | `data first-steps 180 3`; also exercised by both profiling scripts below |
+| `boardcardtest.py`, `transitiontest.py`, `profiletest.py` | No arguments; existing regression assertions |
+| `profile.py` | `--data data --out OUTPUT --expected-games 106`; all levels, 180 samples, three repetitions; affinity recorded as null on platforms without that API |
+| `pocketdisktest.mjs` | `node host/pocketdisktest.mjs` |
+| `scripts/pocket-heap-test.py` | All generated-fixture allocation regressions |
+| `scripts/pocket-inventory-test.py` | `InventoryTests.test_missing_assets_remain_in_inventory_and_duplicates_are_rejected` |
+
+These checks require files outside this repository and are explicitly skipped:
+
+- The other inventory test, `test_runner_records_every_packed_level_and_checkout_identity`,
+  invokes `scripts/pocket-heap-audit.py`, which requires a separate Game-Maker checkout,
+  its git identity, Node/npm and `npm run check:cyd`.
+- The full heap audit additionally needs an exported microSD `games.txt` and assets:
+  `GAMEMAKER_DIR=/path/to/GameMaker python3 scripts/pocket-heap-audit.py --card CARD/pocket --out OUTPUT --expected-games 121`.
+  Reconcile that count if using a different inventory. Its local heap probe and
+  fixture regressions still run in the suite.
+- Engine parity, golden screenshot comparisons and winning Continue/Restart
+  walkthroughs are in Game-Maker's `web/scripts/pocketHostCheck.ts` (including
+  `--resume`), `pocketCardsCheck.ts` and `pocketControlsCheck.ts`. Running the local
+  producers does not claim those comparisons passed.
+- Real exported microSD/`.GMP` game probes need external games. Generated malformed
+  bundle fixtures are still tested by `hostpaktest`.
+
+The serial scripts (`pocketDiskTest.py`, `pocketBoardCheck.py`, `pocketHeldTrace.py`,
+`pocketWalk.py`) require hardware and are outside the host suite. `pocketIconsShot.py`
+is a Pillow illustration utility; its underlying `iconsdump` producer runs above.
+`tools/svgHand.py` and `scripts/build-pages.sh` generate assets/build firmware and
+are not tests.
+
 ## Reader failures
 
 ```sh
