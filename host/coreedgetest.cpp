@@ -13,15 +13,10 @@
 
 using namespace gm;
 using Bytes = std::vector<uint8_t>;
-static int failures = 0, checks = 0, xfails = 0;
+static int failures = 0, checks = 0;
 static void check(bool ok, const char* name) {
   ++checks;
   if (!ok) { ++failures; printf("FAIL %s\n", name); }
-}
-// Strict expected failure: an unexpected pass fails the suite so stale bug markers get removed.
-static void xfail(bool ok, const char* bug) {
-  if (ok) { ++failures; printf("XPASS %s\n", bug); }
-  else { ++xfails; printf("XFAIL %s\n", bug); }
 }
 static void put16(Bytes& b, size_t p, int v) {
   b.at(p) = uint8_t(v); b.at(p + 1) = uint8_t(unsigned(v) >> 8);
@@ -322,15 +317,19 @@ static void mapEdges() {
     for (int gy = 0; gy < SIZEY; ++gy) w.renderRow(gy, row + 1);
     check(row[0] == 123 && row[SIZEX + 1] == 123, "edge rendering preserves row guards");
   }
-  // BUG: enterLevel stores damaged .GAM coordinates verbatim; chkMapBounds subtracts
-  // only once. getTouch reads safely via mapBlock, but dropBlock/checkTouch can then
-  // use the unnormalized coordinates as raw map indices. Stop before unsafe writes.
-  for (int v : {-32768, -101, 200, 32767}) {
+  // Damaged entries must be normalized before scrolling or direct map writes.
+  for (int v : {INT_MIN, -32768, -101, -1, 100, 200, 32767, INT_MAX}) {
     check(w.enterLevel(0, v, v), "damaged coordinate fixture enters");
+    check(w.cx[0] == wrap(v, MLEN) && w.cy[0] == wrap(v, MWID), "damaged entry immediately wraps");
+    check(w.mx == wrap(w.cx[0] - SCRNBLEN / 2, MLEN) &&
+          w.my == wrap(w.cy[0] - SCRNBWID / 2, MWID), "damaged entry centers bounded viewport");
     Touch t = w.getTouch();
-    check(t.num[2] <= BACKBL, "damaged coordinates have bounded read");
+    check(t.bx[2] == wrap(v, MLEN) && t.by[2] == wrap(v, MWID), "damaged coordinates have bounded touch indices");
+    w.dropSlot = 0; w.inv[0] = 42;
+    check(w.dropBlock() && w.map[wrap(v, MWID) * MLEN + wrap(v, MLEN)] == 42, "damaged entry permits direct map write");
+    w.cx[0] = w.cy[0] = v;
     w.chkMapBounds();
-    xfail(w.cx[0] == wrap(v, MLEN) && w.cy[0] == wrap(v, MWID), "damaged scene entry coordinates remain outside map");
+    check(w.cx[0] == wrap(v, MLEN) && w.cy[0] == wrap(v, MWID), "damaged coordinates wrap by full map size");
   }
 }
 
@@ -359,8 +358,8 @@ static void links() {
     check(f.begin(), "damaged link fixture loads");
     f.w->hold = true;
     check(f.w->tick() == 'L' && f.w->finish(), "damaged link transition reports loaded");
-    // Same unnormalized entry bug as damaged start coordinates. No unsafe map write.
-    xfail(f.w->cx[0] == wrap(v, MLEN) && f.w->cy[0] == wrap(v, MWID), "damaged link destination remains outside map");
+    // Link destinations use the same normalized entry path.
+    check(f.w->cx[0] == wrap(v, MLEN) && f.w->cy[0] == wrap(v, MWID), "damaged link destination wraps by map size");
   }
 }
 
@@ -418,17 +417,14 @@ static void counters() {
   check(w.doBlockTouchChar(a) == 1 && w.score == INT_MAX, "score reaches positive int32 endpoint");
   w.score = INT_MIN + 32768; a.scorePts = -32768;
   check(w.doBlockTouchChar(a) == 1 && w.score == INT_MIN, "score reaches negative int32 endpoint");
-  // BUG: score += scorePts (also monster upscore) is signed int overflow, with no
-  // explicit wrap like lives. Do NOT execute undefined C++ arithmetic or depend on
-  // a crash. Check the representable precondition before attempting either overflow.
-  // These strict XFAILs document the missing defined overflow path, not a DOS oracle
-  // for signed long overflow (PLAYGAME used signed long addition too).
-  for (int delta : {-1, 1}) {
-    w.score = delta > 0 ? INT_MAX : INT_MIN;
-    int64_t sum = int64_t(w.score) + delta;
-    bool safe = sum >= INT_MIN && sum <= INT_MAX;
-    if (safe) { a.scorePts = delta; w.doBlockTouchChar(a); }
-    xfail(safe, "score addition has no defined int32 overflow path (precondition probe)");
+  // DOS signed-long overflow is undefined; the core clamps at int32 limits.
+  for (int delta : {-32768, -1, 0, 1, 32767}) {
+    for (int start : {INT_MIN, INT_MIN + 1, -32768, 0, 32767, INT_MAX - 1, INT_MAX}) {
+      w.score = start; a.scorePts = delta;
+      int64_t sum = int64_t(start) + delta;
+      int expected = sum < INT_MIN ? INT_MIN : sum > INT_MAX ? INT_MAX : int(sum);
+      check(w.doBlockTouchChar(a) == 1 && w.score == expected, "block score clamps only outside int32 range");
+    }
   }
   for (int effect : {0, 2, 29, 30, 31, 255}) {
     a = {}; a.effect = effect; a.eamt = 1;
@@ -482,8 +478,32 @@ static void timerWrap() {
   check(w.mi[0].curPic == 0 && w.mi[0].nextMove == 0, "monster movement deadline wraps");
 }
 
+static void monsterScores() {
+  Fixture f; check(f.begin(), "monster score fixture loads");
+  auto& w = *f.w;
+  memset(f.a.mbl, 0, BLOCK_BYTES);  // Opaque, overlapping pictures ensure collision.
+  for (int stronger : {0, 1}) for (int delta : {-32768, -1, 0, 1, 32767}) {
+    for (int start : {INT_MIN, INT_MIN + 32768, 0, INT_MAX - 32767, INT_MAX}) {
+      for (int m = 0; m < 2; ++m) {
+        uint8_t* mo = f.a.mon + m * MONSTER_BYTES;
+        mo[8] = m == stronger ? 2 : 1;
+        mo[99] = uint8_t(delta); mo[100] = uint8_t(unsigned(delta) >> 8);
+        w.mm[m] = {uint8_t(m), 1, 1};
+        w.resetMonInfo(m); w.mi[m].curPic = 0;
+        w.mi[m].fromchar = m == stronger ? 1 : 0;
+      }
+      w.score = start;
+      int64_t sum = int64_t(start) + delta;
+      int expected = sum < INT_MIN ? INT_MIN : sum > INT_MAX ? INT_MAX : int(sum);
+      check(w.doCollision(0, 1, 0) == LASTMM && w.score == expected &&
+            w.mm[0].monnum == LASTMON && w.mm[1].monnum == LASTMON,
+            "both monster score paths clamp only outside int32 range");
+    }
+  }
+}
+
 int main() {
-  damagedAssets(); metadata(); recordFields(); mapEdges(); links(); monsters(); counters(); timerWrap();
-  printf("coreedgetest: %d checks, %d expected failures, %d failures\n", checks, xfails, failures);
+  damagedAssets(); metadata(); recordFields(); mapEdges(); links(); monsters(); counters(); monsterScores(); timerWrap();
+  printf("coreedgetest: %d checks, %d failures\n", checks, failures);
   return failures ? 1 : 0;
 }

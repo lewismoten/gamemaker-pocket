@@ -26,16 +26,11 @@ labels, map edges/corners, missing-scene transitions, 200 live monsters and the
 core reads the converted cfg and assets; this does **not** test a raw DOS `.GAM`
 parser. Truncated cfg records with all required fields present remain valid prefixes.
 
-Known bugs are strict expected failures (`XFAIL`; an unexpected pass fails):
-
-- Damaged start/link coordinates remain outside the map after entry and the
-  single-step bounds adjustment. Reads through `mapBlock` wrap, but later direct
-  map writes can be out of bounds. Probes stop before those unsafe writes.
-- Score addition has no defined signed 32-bit overflow path. The two overflow
-  probes check representability before the addition, rather than execute undefined
-  arithmetic. These are precondition diagnostics, not runtime overflow tests; review
-  them when implementing a defined score overflow rule. Ordinary score arithmetic
-  is exercised through both signed 32-bit endpoints and across the DOS 16-bit limit.
+Damaged start/link coordinates wrap by map size before scrolling, touches, or direct
+map writes. Score additions from blocks and both monster-collision paths preserve
+representable DOS signed-long results and clamp at the signed 32-bit endpoints when
+DOS signed overflow had no defined result. The edge tests execute these overflow
+cases directly, alongside ordinary arithmetic across the DOS 16-bit limit.
 
 Timer tests pin the raw unsigned deadline comparisons inherited from PLAYGAME's
 `moveChars`, `changeBlocks`, and monster movement, including early wrapped deadlines
