@@ -8,7 +8,7 @@
 #include <string.h>
 namespace pk {
 namespace sfs {
-constexpr uint32_t BLOCK = 4096, CHUNK_MAX = 1024, FILE_MAX = 2u * 1024 * 1024;
+constexpr uint32_t BLOCK = 4096, CHUNK_MAX = 1024, FILE_MAX = 2u * 1024 * 1024, ORDER_MAX = 256;
 inline bool nameChar(char c) { return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-'; }
 // NAME.GMP: 1 to 8 name characters, then .GMP, nothing else (no path, no lower case, no spaces).
 inline bool gmpName(const char* s) {
@@ -26,10 +26,11 @@ inline uint32_t crcUpdate(uint32_t c, const void* data, size_t n) {
 constexpr uint32_t CRC_START = 0xffffffffu;
 inline uint32_t crcDone(uint32_t c) { return c ^ 0xffffffffu; }
 inline uint32_t roundUp(uint32_t n) { return (n + BLOCK - 1) / BLOCK * BLOCK; }
-// Does a file of `size` bytes fit, with the file it replaces (replaced bytes, 0 if new) given back? Keeps two blocks free for the file system.
-inline bool fits(uint32_t size, uint32_t replaced, uint32_t total, uint32_t used) {
+// Does a file of `size` bytes fit? Keeps two blocks free for the file system. A file it replaces is not credited: the old copy
+// stays until the new one is whole and renamed over it, so both are on the board for a while.
+inline bool fits(uint32_t size, uint32_t total, uint32_t used) {
   if (size == 0 || size > FILE_MAX) return false;
-  uint64_t free_ = (uint64_t)(total > used ? total - used : 0) + roundUp(replaced);
+  uint64_t free_ = (uint64_t)(total > used ? total - used : 0);
   return (uint64_t)roundUp(size) + 2 * BLOCK <= free_;
 }
 enum Kind { BAD, LS, PUT, CHUNK, END, DEL, ORDER, RESCAN, ABORT, HELLO };
@@ -76,7 +77,7 @@ inline Cmd parse(const char* line) {
     if (!num(p, c.crc, 16, 8) || *p) { c.why = "bad crc"; return c; }
     c.kind = CHUNK;
   } else if (!strcmp(verb, "ORDER")) {
-    if (!num(p, c.count, 10, 3) || c.count > 64 || *p) { c.why = "bad count"; return c; }
+    if (!num(p, c.count, 10, 3) || c.count > ORDER_MAX || *p) { c.why = "bad count"; return c; }
     c.kind = ORDER;
   } else { c.why = "unknown verb"; return c; }
   if ((c.kind == LS || c.kind == HELLO || c.kind == RESCAN || c.kind == ABORT || c.kind == END) && *p) { c.kind = BAD; c.why = "extra text"; }
