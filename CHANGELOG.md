@@ -6,6 +6,7 @@ The firmware has no release number of its own. Every build bakes in its git hash
 
 ### Added
 
+- The boot splash is the UI pack's castle art with a live status line below it ("Starting up", "Looking for games"), drawn from run-length coded app flash at 320 x 240 and 480 x 320 (`tools/splashPack.py`, `art/ui-pack/`); it replaces the 160 x 100 sting frame and shrinks the firmware by about 25 KB. The first-run display setup is unchanged and still comes first.
 - Games can be kept in the board's flash (LittleFS `/games`) and play like card games, marked On board; a card copy wins over a board copy.
 - The web flasher's Send games tab and the serial `DISK` commands: list, send, remove and reorder the games in the board's flash over USB (`src/serialfs.h`, `docs/send.js`, `docs/pocketdisk.js`).
 - The web flasher's "Player + starter games" install (Virus Blaster, Snowbound, KEEP IT BRIEF!, Sandcastle Knight, Where's the Remote?!), now its default.

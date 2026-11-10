@@ -2216,7 +2216,7 @@ void setup() {
   if (dsState != 3) runDisplaySetup();  // first start (or one left unfinished): the display setup screen
 #endif
   pk::drawSplash(tft, scr::W, scr::H, true);  // the Sandbox logo first; the picker replaces it once the list is loaded
-  pk::splashLine(tft, scr::W, scr::H, "Starting up");
+  pk::splashLine(tft, scr::W, scr::H, "Starting up", true);
   spk::begin();
   haveGT = gt.probe();
   char line[64];
@@ -2245,7 +2245,7 @@ void setup() {
   statusLed.enabled = ledOn;
   resumeLoad();
   spk::setVolume(settings.sound);
-  pk::splashLine(tft, scr::W, scr::H, "Looking for games");
+  pk::splashLine(tft, scr::W, scr::H, "Looking for games", true);
   loadGameList();
   Serial.printf("BOOT ms=%lu list-loaded games=%d\n", (unsigned long)millis(), ngames);
   if (!ngames) Serial.println("BOOT no flash games: card discovery is pending");
