@@ -172,6 +172,8 @@ struct World {
   // ---- data access --------------------------------------------------------------------------
   const uint8_t* seqRaw(int s) const { return chr + s * SEQ_BYTES; }
   int seqKey(int s) const { return u16(seqRaw(s) + 170); }
+  // The scan code is the key's upper byte; keydn has 128 slots, so a damaged CHR's 128..255 must never index it.
+  bool seqKeyDown(int s) const { int k = seqKey(s) >> 8; return k < 128 && keydn[k] != 0; }
   int seqSound(int s) const { return (int8_t)seqRaw(s)[172]; }
   int seqBloc(int s) const { return seqRaw(s)[174]; }
   int seqGround(int s) const { return (int8_t)seqRaw(s)[175]; }
@@ -431,7 +433,7 @@ struct World {
       inv[MAXINV - 1] = BACKBL;
       dropped = true;
     }
-    keydn[seqKey(DROPSEQ) >> 8] = 0;
+    if ((seqKey(DROPSEQ) >> 8) < 128) keydn[seqKey(DROPSEQ) >> 8] = 0;
     return dropped;
   }
 
@@ -625,7 +627,7 @@ struct World {
             return true;
           }
           if ((meter[cseq] <= 0 && cseq > 4) || cseq == HURTSEQ || cseq == DROPSEQ || cseq == PICKUPSEQ ||
-              seqNorepeat(cseq) || keydn[seqKey(cseq) >> 8] == 0 || zeroBefore > 1) {
+              seqNorepeat(cseq) || !seqKeyDown(cseq) || zeroBefore > 1) {
             popKey(curkey);
             zeroBefore = 0;
           } else {

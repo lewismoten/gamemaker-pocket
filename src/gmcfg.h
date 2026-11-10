@@ -254,6 +254,8 @@ struct Assets {
         !swap(a.cbl, a.cblName, L.cbl, (uint64_t)L.ncbl * BLOCK_BYTES, a) ||
         !swap(a.chr, a.chrName, L.chr, 3784, a))
       return false;
+    // Same rule as Game-Maker OS: a sequence key's scan code (upper byte) of 128 or more would index past keydn[128].
+    for (int i = 0; i < MAXSEQ; i++) if (a.chr[i * SEQ_BYTES + 171] >= 128) return false;
     if (strcmp(a.palName, L.pal)) {
       size_t n = 0;
       uint8_t* p = a.readz(L.pal, &n);
