@@ -32,15 +32,16 @@
       }
       * { box-sizing: border-box; }
       html { background: var(--bg); }
-      body { margin: 0; font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--fg); }
-      a { color: var(--blue); }
+      body { margin: 0; font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--fg); overflow-wrap: anywhere; }
+      a { color: var(--blue); text-underline-offset: 3px; }
+      a { display: inline-block; min-height: 24px; }
       a:focus-visible, button:focus-visible, [role='tab']:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
       .wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
-      main { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 32px; padding: 20px 0 12px; align-items: start; border-top: 1px solid var(--rule); margin-top: 12px; }
+      main { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 32px; padding: 20px 0 12px; align-items: start; border-top: 1px solid var(--rule); margin-top: 12px; }
       .edition { display: flex; align-items: center; gap: 14px; margin: 0 0 8px; }
       .edition img { width: 52px; height: 52px; image-rendering: pixelated; flex: none; }
       .edition span { font: 400 1.05rem/1.2 var(--pixel); color: var(--yellow); letter-spacing: 0.08em; text-transform: uppercase; }
-      h1 { margin: 0; font: 700 clamp(1.7rem, 4.4vw, 2.9rem)/1.05 var(--pixel); letter-spacing: 0; text-transform: uppercase; white-space: nowrap; }
+      h1 { margin: 0; font: 700 clamp(1.7rem, 4.4vw, 2.9rem)/1.05 var(--pixel); letter-spacing: 0; text-transform: uppercase; overflow-wrap: anywhere; }
       h1 em { display: block; font-style: normal; color: var(--yellow); }
       .tag { font: 400 1.05rem/1.4 var(--pixel); letter-spacing: 0.06em; margin: 16px 0 4px; text-transform: uppercase; }
       .chips { font: 400 0.8rem/1.4 var(--pixel); color: var(--muted); letter-spacing: 0.08em; margin: 0 0 12px; text-transform: uppercase; }
@@ -49,11 +50,11 @@
       figcaption { font: 400 0.75rem/1.4 var(--pixel); color: var(--muted); letter-spacing: 0.08em; margin-top: 6px; text-transform: uppercase; }
       .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; min-width: 0; }
       [role='tablist'] { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--rule); }
-      [role='tab'] { font: 400 0.82rem/1.2 var(--pixel); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 14px; min-height: 44px; cursor: pointer; }
-      [role='tab'][aria-selected='true'] { color: var(--fg); border-bottom-color: var(--yellow-fill); }
+      [role='tab'] { font: 600 0.95rem/1.4 system-ui, sans-serif; color: var(--muted); background: none; border: 0; border-bottom: 3px solid transparent; padding: 12px 14px; min-height: 44px; cursor: pointer; }
+      [role='tab'][aria-selected='true'] { color: var(--fg); background: var(--sel); border-bottom-color: var(--blue); }
       [role='tabpanel'] { padding: 16px 18px 18px; }
       [role='tabpanel'][hidden] { display: none; }
-      h2 { font: 700 0.95rem/1.3 var(--pixel); letter-spacing: 0.04em; margin: 16px 0 8px; text-transform: uppercase; color: var(--blue); }
+      h2 { font: 700 1.15rem/1.4 system-ui, sans-serif; letter-spacing: 0.04em; margin: 16px 0 8px; color: var(--blue); }
       h2:first-child { margin-top: 0; }
       fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
       legend { padding: 0; margin-bottom: 8px; color: var(--muted); font-size: 0.94rem; }
@@ -63,8 +64,9 @@
       .choice:has(input:checked) { border-color: var(--yellow-fill); background: var(--sel); box-shadow: 0 0 0 2px var(--yellow-fill); }
       .choice:has(input:focus-visible) { outline: 3px solid var(--blue); outline-offset: 3px; }
       .choice input { position: absolute; top: 10px; left: 10px; width: 24px; height: 24px; margin: 0; accent-color: #0a5a99; }
-      .choice img { display: block; width: 100%; max-width: 200px; height: auto; margin: 0 auto; }
-      .choice b { display: block; font: 700 0.8rem/1.3 var(--pixel); letter-spacing: 0.03em; text-transform: uppercase; padding-left: 32px; }
+      .choice img { display: block; width: 100%; max-width: 230px; height: 135px; object-fit: contain; margin: 10px auto 0; }
+      .choice b { display: block; font-size: 1.15rem; }
+      .choice .model { font-weight: 600; color: var(--fg); overflow-wrap: anywhere; }
       .choice span { color: var(--muted); font-size: 0.88rem; }
       ol, ul { margin: 0 0 8px; padding-left: 1.3rem; }
       li { margin: 2px 0; }
@@ -84,14 +86,33 @@
       details { margin: 6px 0; }
       summary { cursor: pointer; padding: 4px 0; min-height: 24px; }
       label.ack { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; cursor: pointer; }
-      fieldset.variants { border: 0; padding: 0; margin: 12px 0 0; }
-      fieldset.variants legend { font-weight: 600; padding: 0; }
+      fieldset.variants { border: 0; padding: 0; margin: 0; }
+      fieldset.variants legend { padding: 0; }
+      .variants .ack { border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+      .variants .ack:has(input:checked) { border-color: var(--blue); background: var(--sel); }
+      .variants strong { display: block; color: var(--fg); }
+      .step { border-top: 1px solid var(--rule); padding-top: 20px; margin-top: 24px; }
+      .step:first-of-type { border-top: 0; padding-top: 0; margin-top: 20px; }
+      .step-number { display: inline-grid; place-items: center; width: 30px; height: 30px; margin-right: 8px; border-radius: 50%; background: var(--blue); color: var(--panel); }
+      .requirements { padding: 12px 16px; background: var(--sel); border-radius: 6px; }
+      .requirements p { margin: 4px 0; }
+      .flow { color: var(--muted); margin: 0 0 16px; }
+      .selection { font-weight: 600; }
+      .skip-link { position: absolute; left: 16px; top: -100px; padding: 10px; background: var(--panel); z-index: 1; }
+      .skip-link:focus { top: 8px; }
+      .help { margin-top: 24px; border-top: 1px solid var(--rule); padding-top: 16px; }
+      .help details { border-bottom: 1px solid var(--rule); padding: 6px 0; }
+      .help summary { min-height: 44px; padding: 10px 0; font-weight: 600; }
+      .help p { margin: 4px 0 12px; }
+      .tablewrap table { table-layout: fixed; overflow-wrap: anywhere; }
+      input[type="file"] { min-height: 44px; }
+      input::file-selector-button { min-height: 44px; }
       label.ack input { width: 24px; height: 24px; flex: none; margin: 0; accent-color: #0a5a99; }
       footer { border-top: 1px solid var(--rule); padding: 10px 0 18px; font-size: 0.82rem; color: var(--muted); }
       footer p { margin: 0; }
-      .btn { font: 700 0.8rem/1.2 var(--pixel); letter-spacing: 0.04em; text-transform: uppercase; color: #fff; background: #0a5a99; border: 2px solid #0a5a99; border-radius: 4px; padding: 10px 16px; min-height: 44px; cursor: pointer; }
+      .btn { font: 600 1rem/1.4 system-ui, sans-serif; color: #fff; background: #0a5a99; border: 2px solid #0a5a99; border-radius: 4px; padding: 10px 16px; min-height: 44px; cursor: pointer; }
       .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-      .btn.small-btn { font-size: 0.7rem; padding: 4px 10px; min-height: 32px; color: var(--fg); background: var(--panel); border-color: var(--line); }
+      .btn.small-btn { font-size: 0.875rem; padding: 4px 10px; min-height: 32px; color: var(--fg); background: var(--panel); border-color: var(--line); }
       @media (prefers-color-scheme: dark) { .btn { background: #78b8f8; border-color: #78b8f8; color: #101428; } }
       #p-send ul, #p-send ol { padding-left: 0; list-style: none; }
       .gamerow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--rule); }
@@ -108,12 +129,15 @@
       @media (max-width: 520px) {
         .boards { grid-template-columns: 1fr; }
         [role='tabpanel'] { padding: 14px 12px; }
-        [role='tab'] { padding: 10px 9px; font-size: 0.74rem; }
+        [role='tab'] { flex: 1 1 45%; padding: 12px 8px; font-size: 0.9rem; }
+        .edition span { font-size: 0.9rem; }
+        h1 { font-size: 1.7rem; }
       }
       @media (prefers-reduced-motion: no-preference) { .choice { transition: border-color 0.15s, background 0.15s; } }
     </style>
   </head>
   <body>
+    <a class="skip-link" href="#installer">Skip to installer</a>
     <div class="wrap">
       <main>
         <section aria-label="About">
@@ -121,63 +145,99 @@
           <h1>Game-Maker <em>Pocket</em></h1>
           <p class="tag">DOS games in your pocket</p>
           <p class="chips">ESP32 / touchscreen / microSD</p>
-          <p class="small">Flash the Pocket Player onto a small ESP32 touch-screen board from your browser. Nothing to install on your computer.</p>
+          <p class="small">Flash the Pocket Player onto a small ESP32 touch-screen board from your browser. Choose your board, choose what to install, then connect over USB.</p>
           <figure class="hero-board">
             <img src="images/board-library.png" width="577" height="413" alt="The Pocket Player's game library on a 3.5 inch board: six game tiles, page buttons and a Details button" />
             <figcaption>ESP32-3248S035 / 3.5 in</figcaption>
           </figure>
         </section>
 
-        <section class="panel" aria-label="Installer">
+        <section class="panel" id="installer" aria-label="Installer" tabindex="-1">
           <div role="tablist" aria-label="Sections">
-            <button role="tab" id="tab-install" aria-controls="p-install" aria-selected="true">1. Install</button>
-            <button role="tab" id="tab-games" aria-controls="p-games" aria-selected="false" tabindex="-1">2. Add games</button>
-            <button role="tab" id="tab-send" aria-controls="p-send" aria-selected="false" tabindex="-1">3. Send games</button>
+            <button role="tab" id="tab-install" aria-controls="p-install" aria-selected="true">Install player</button>
+            <button role="tab" id="tab-games" aria-controls="p-games" aria-selected="false" tabindex="-1">Games on microSD</button>
+            <button role="tab" id="tab-send" aria-controls="p-send" aria-selected="false" tabindex="-1">Send games over USB</button>
             <button role="tab" id="tab-other" aria-controls="p-other" aria-selected="false" tabindex="-1">Other boards</button>
           </div>
 
           <div role="tabpanel" id="p-install" aria-labelledby="tab-install">
-            <h2>Pick your board</h2>
-            <fieldset>
-              <legend>The model name is printed on the back of the board.</legend>
-              <div class="boards">
-                <label class="choice">
-                  <input type="radio" name="board" value="35" />
-                  <img src="img/board-35.svg" alt="Drawing of the 3.5 inch board: a yellow-orange board with a wide screen showing the game library" width="297" height="165" />
-                  <b>3.5 inch: ESP32-3248S035</b>
-                  <span>480 x 320, light finger touch (capacitive).</span>
-                </label>
-                <label class="choice">
-                  <input type="radio" name="board" value="28" />
-                  <img src="img/board-28.svg" alt="Drawing of the 2.8 inch board: a smaller orange board with a black-framed screen" width="258" height="150" />
-                  <b>2.8 inch: ESP32-2432S028</b>
-                  <span>320 x 240, firmer press or stylus (resistive). The "Cheap Yellow Display".</span>
-                </label>
-              </div>
-            </fieldset>
-            <p class="small">The pictures are drawings, not photos. Another model? See the Other boards tab first.</p>
-            <fieldset class="variants">
-              <legend>What to install</legend>
-              <label class="ack"><input type="radio" name="variant" value="games" checked /> <span><strong>Player + starter games</strong> (recommended). The player and five real games to play right away, no microSD card needed: Virus Blaster, Snowbound, KEEP IT BRIEF!, Sandcastle Knight and Where's the Remote?!</span></label>
-              <label class="ack"><input type="radio" name="variant" value="courses" /> <span><strong>Player + Starter courses.</strong> The player and the 106 short Starter lessons that teach how games are made.</span></label>
-              <label class="ack"><input type="radio" name="variant" value="player" /> <span><strong>Player only.</strong> No games on the board; add your own on a microSD card or over USB with Send games.</span></label>
-            </fieldset>
-            <label class="ack"><input type="checkbox" id="install-ack" /> <span>I understand this replaces the games and file-based controls settings stored on the board. It keeps saved display setup and other NVS values, and leaves the microSD card alone.</span></label>
-            <div id="install-slot" aria-live="polite"><p class="small">Pick a board and tick the box to show the Install button.</p></div>
-            <h2>Steps</h2>
-            <ol>
-              <li>Desktop Chrome or Edge (Firefox, Safari and phones can't flash).</li>
-              <li>Plug the board in with a USB cable that carries data.</li>
-              <li>Click Connect, choose the board's serial port, then click Install. It takes a few minutes.</li>
-              <li>If it can't connect, hold the BOOT button while plugging in or while clicking Connect.</li>
-            </ol>
-            <h2>What gets installed</h2>
-            <p class="small" id="what">The player's firmware and, with <em>Player + starter games</em>, five games kept in the board's flash (they show an On board tag and play like card games); with <em>Player + Starter courses</em>, its library (the 106 Starter games). <em>Player only</em> leaves the library empty (just the player's font file), and the player then shows a screen that explains how to add games from a card. The install writes four parts of the 4 MB flash: bootloader, partition table, firmware, and the library's LittleFS area (the last 3 MB). It <strong>replaces the games stored on the board and the file-based controls settings</strong> (<code>settings.txt</code> lives in that area). It <strong>keeps</strong> the display setup, touch calibration and other saved values (the board's NVS area, which is not written; checked on a real board: unchanged byte for byte after an install), and it never touches the microSD card. Anything else that was in the 3 MB library area is gone, so back it up first if you stored your own files there.</p>
+            <h2>Install Game-Maker Pocket</h2>
+            <p class="flow">1. Pick your board → 2. Pick an install → 3. Connect and install</p>
+            <div class="requirements">
+              <p><strong>Before you start</strong></p>
+              <p>Use <strong>desktop Chrome or Edge</strong> and a <strong>USB data cable</strong>. A charge-only cable will power the board but cannot install the player.</p>
+              <p class="small">Open this site over HTTPS. Firefox, Safari and phones cannot install firmware here.</p>
+            </div>
+            <noscript><p class="note">Turn on JavaScript to choose a board and use the installer.</p></noscript>
+            <section class="step" aria-labelledby="board-heading">
+              <h2 id="board-heading"><span class="step-number">1</span>Pick your board</h2>
+              <fieldset>
+                <legend>Match the model printed on the back of your board.</legend>
+                <div class="boards">
+                  <label class="choice">
+                    <input type="radio" name="board" value="28" />
+                    <img src="img/board-28.svg" alt="Illustration of the 2.8 inch board with its smaller, black-framed screen" width="258" height="150" />
+                    <b>2.8 inch</b>
+                    <span class="model">ESP32-2432S028</span>
+                    <span>Cheap Yellow Display · 320 × 240<br />Press with a finger or stylus (resistive touch).</span>
+                  </label>
+                  <label class="choice">
+                    <input type="radio" name="board" value="35" />
+                    <img src="img/board-35.svg" alt="Illustration of the 3.5 inch board with its wider screen" width="297" height="165" />
+                    <b>3.5 inch</b>
+                    <span class="model">ESP32-3248S035</span>
+                    <span>480 × 320<br />Light finger touch (GT911 capacitive touch).</span>
+                  </label>
+                </div>
+              </fieldset>
+              <p class="small">Illustrations show the front of each board. Check the model and touch type, not just the appearance. Not a match? <a href="#other">Check other boards</a>.</p>
+            </section>
+            <section class="step" aria-labelledby="variant-heading">
+              <h2 id="variant-heading"><span class="step-number">2</span>Pick what to install</h2>
+              <fieldset class="variants">
+                <legend>All three options include the same player for your selected board.</legend>
+                <label class="ack"><input type="radio" name="variant" value="games" checked /> <span><strong>Player + starter games · Recommended</strong>Five games ready to play, with no microSD card needed.</span></label>
+                <label class="ack"><input type="radio" name="variant" value="courses" /> <span><strong>Player + Starter courses</strong>106 short lessons that show how games are made.</span></label>
+                <label class="ack"><input type="radio" name="variant" value="player" /> <span><strong>Player only</strong>No games included; add your own on a microSD card or over USB with Send games.</span></label>
+              </fieldset>
+              <details><summary>Which five starter games are included?</summary><p class="small">Virus Blaster, Snowbound, KEEP IT BRIEF!, Sandcastle Knight and Where’s the Remote?!</p></details>
+            </section>
+            <section class="step" aria-labelledby="connect-heading">
+              <h2 id="connect-heading"><span class="step-number">3</span>Connect and install</h2>
+              <ol>
+                <li>Plug your board into the computer with a USB data cable.</li>
+                <li>Review your choices and confirm the replacement below.</li>
+                <li>Choose <strong>Connect and install</strong>, select the board’s serial port, then choose <strong>Install</strong> in the installer.</li>
+              </ol>
+              <p>Keep the cable connected until the installer says it is finished. Installation takes a few minutes.</p>
+              <p id="install-selection" class="selection" aria-live="polite">No board selected.</p>
+              <div class="note">Installing replaces games and control settings stored on the board. Back up any files you want to keep first. Your microSD card, display setup and touch calibration are kept.</div>
+              <label class="ack"><input type="checkbox" id="install-ack" /> <span>I understand that installing replaces the games and file-based controls settings stored on the board. It keeps saved display setup and other NVS values, and leaves the microSD card alone.</span></label>
+              <div id="install-slot" aria-live="polite"><p class="small">Pick a board and check the confirmation box to show the install button.</p></div>
+            </section>
+            <section class="help" aria-labelledby="after-heading">
+              <h2 id="after-heading">After installation</h2>
+              <p>The board restarts into Game-Maker Pocket. If it stays on the install screen, press its RESET (RST) button or unplug and reconnect it.</p>
+              <p>On a new 2.8 inch board, follow the display setup and touch calibration prompts. The 3.5 inch board needs no touch calibration. Open a game, then choose Play. With Player only, add games first.</p>
+              <p><a href="#send">Send games over USB</a> to store games on the board, or <a href="#games">add games on a microSD card</a>.</p>
+            </section>
+            <section class="help" aria-labelledby="help-heading">
+              <h2 id="help-heading">Troubleshooting</h2>
+              <details><summary>No serial port is listed</summary><p>Try a known USB data cable and another USB port on your computer. Connect directly instead of through a hub. Close other tabs or programs using the board, then try again in desktop Chrome or Edge.</p><p>If no port appears, check the USB driver below.</p></details>
+              <details><summary>The board will not connect</summary><p>Close serial monitors and disconnect from the Send games over USB tab. Try again while holding the board’s BOOT button; release it when installation starts. You can also hold BOOT while plugging in the cable.</p></details>
+              <details><summary>I picked the wrong board, or the screen looks wrong</summary><p>Check the model on the back, select the matching board in step 1, and install again. The installer checks the ESP32 chip but cannot distinguish these two screen sizes. Installing again replaces games and control settings on the board.</p><p>On a 2.8 inch board, wrong colors or orientation can be fixed in Settings → Display → Panel setup. If the display is blank or unreadable, hold BOOT for about two seconds to try the other display driver. For a different model or a 3.5 inch board with resistive touch, <a href="#other">check other boards</a>.</p></details>
+              <details><summary>Do I need a USB driver?</summary><p>If a known data cable works but your computer still sees no serial port, the USB-to-serial chip may need a driver. Check the chip marking or the board seller’s instructions for CH340/CH341 or CP210x, and get the matching driver from its manufacturer (WCH or Silicon Labs). Reconnect the board after installing the driver.</p></details>
+            </section>
+            <details class="help">
+              <summary>What gets installed and what is kept</summary>
+              <p class="small" id="what">Each option installs the bootloader, partition table, player firmware and on-board library. Player + starter games includes five games; Player + Starter courses includes 106 lessons; Player only includes the player’s font and an empty library.</p>
+              <p class="small">Installation replaces the 3 MB library area, including games, control settings and any other files stored there. Back up your files before installing. Display setup, touch calibration and other values in the separate NVS storage area are kept. The microSD card is never written by the installer.</p>
+            </details>
           </div>
 
           <div role="tabpanel" id="p-games" aria-labelledby="tab-games" hidden>
             <h2>Adding games to a microSD card</h2>
-            <p class="small">The starter games (or the 106 Starters) are already on the board if you chose them. Any other game goes on a card, one <code>.GMP</code> file each. No card? The Send games tab puts them in the board's flash over USB.</p>
+            <p class="small">The starter games (or the 106 Starters) are already on the board if you chose them. Any other game goes on a card, one <code>.GMP</code> file each. No card? The <a href="#send">Send games over USB</a> tab puts them in the board's flash over USB.</p>
             <ol>
               <li><strong>Get games.</strong> On the <a href="https://lewismoten.github.io/GameMaker-SandboxEdition/">Game-Maker: Sandbox Edition</a> site, open a game and choose Download, then <em>Pocket Player (microSD)</em>. It saves <code>NAME.GMP</code>.</li>
               <li><strong>Card.</strong> A microSD card formatted FAT32. Cards from 2 to 32 GB usually come that way; bigger cards usually come as exFAT, so reformat them as FAT32 first.</li>
@@ -193,7 +253,7 @@
             </ul>
             <h2>Troubleshooting</h2>
             <ul>
-              <li><strong>"No card":</strong> the card didn't mount. Re-seat it, then Settings, Card, Rescan.</li>
+              <li><strong>"No card":</strong> the card didn't mount. Reseat it, then Settings, Card, Rescan.</li>
               <li><strong>"Can't read the card":</strong> it should be FAT32. Reformat as FAT32 (MBR) on your computer.</li>
               <li><strong>"No pocket folder":</strong> the folder must be named <code>pocket</code>, at the top of the card.</li>
               <li><strong>A game is missing:</strong> check the name rules, that the file is in <code>/pocket</code> itself, then rescan.</li>
@@ -203,7 +263,7 @@
 
           <div role="tabpanel" id="p-send" aria-labelledby="tab-send" hidden>
             <h2>Send games over the USB cable</h2>
-            <p class="small">For a board with no microSD card. Pick <code>.GMP</code> files (the <em>Pocket Player (microSD)</em> download on the <a href="https://lewismoten.github.io/GameMaker-SandboxEdition/">Game-Maker: Sandbox Edition</a> site) and they are stored in the board's own flash. Desktop Chrome or Edge only.</p>
+            <p class="small">Add games to the board without a microSD card. Pick <code>.GMP</code> files (the <em>Pocket Player (microSD)</em> download on the <a href="https://lewismoten.github.io/GameMaker-SandboxEdition/">Game-Maker: Sandbox Edition</a> site) and they are stored in the board's own flash. Desktop Chrome or Edge only.</p>
             <div class="note"><strong>Works only after the firmware is installed</strong> (the Install tab; older firmware can't do this). Connecting can restart the board, so give it a few seconds, and leave it on its game list, not in Settings, the first-run steps or a game. Close other programs that use the board's USB port.</div>
             <p><button type="button" class="btn" id="send-connect">Connect to the board</button> <button type="button" class="btn small-btn" id="send-disconnect" hidden>Disconnect</button></p>
             <p id="send-status" class="small st" role="status" aria-live="polite">Not connected.</p>
@@ -216,7 +276,7 @@
               <p><label for="send-files">Choose <code>.GMP</code> files</label><br /><input type="file" id="send-files" accept=".gmp,.GMP" multiple /></p>
               <ul id="send-picked" aria-live="polite"></ul>
               <p><button type="button" class="btn" id="send-go" disabled>Send to the board</button></p>
-              <progress id="send-progress" hidden value="0" max="1"></progress>
+              <progress aria-label="Game transfer progress" id="send-progress" hidden value="0" max="1"></progress>
               <div id="delivery-stage" aria-hidden="true"></div>
               <p class="small">Each piece is checked on the board and the game appears only when all of it has arrived. A big game takes a few minutes (the cable is slow). A name longer than 8 letters is shortened. A game with the same name replaces the old one.</p>
             </div>
@@ -260,7 +320,7 @@ esptool.py --port PORT write_flash 0 backup.bin</pre>
             </details>
             <h2>Install the 2.8 inch build on a similar board</h2>
             <label class="ack"><input type="checkbox" id="ack" /> <span>I have read the warning. My board is a 2.8 inch style ESP32 (plain ESP32 chip) with resistive touch, and I accept that it may need setup.</span></label>
-            <div id="other-slot"><p class="small">Tick the box to show the Install button.</p></div>
+            <div id="other-slot"><p class="small">Check the confirmation box to show the Install button.</p></div>
             <p class="small">The installer checks the chip: anything that isn't a plain ESP32 is refused. It can't tell the 2.8 board from the 3.5 board; both are plain ESP32 chips.</p>
           </div>
         </section>

@@ -1,4 +1,4 @@
-// Pocket Player install page (from Game-Maker: Sandbox Edition's flasher): tabs, and the Install buttons.
+// Pocket Player install page (from Game-Maker: Sandbox Edition's flasher): tabs, and the install buttons.
 // The button (ESP Web Tools, vendored in ewt/) is created on the pick, with that board's manifest.
 const MANIFESTS = {
   35: { games: 'manifest-35-games.json', courses: 'manifest-35-courses.json', player: 'manifest-35-player.json' },
@@ -19,15 +19,26 @@ function mount(slot, manifest) {
     s.textContent = text;
     btn.append(s);
   }
+  const activate = document.createElement('button');
+  activate.type = 'button';
+  activate.slot = 'activate';
+  activate.className = 'btn';
+  activate.textContent = 'Connect and install';
+  btn.append(activate);
   slot.append(btn);
 }
 
-// The Install button shows only with a board picked and the box ticked; the variant (Player + starter games by default) picks the manifest.
+// The install button shows only with a board picked and the box ticked; the variant (Player + starter games by default) picks the manifest.
 const installSlot = document.getElementById('install-slot');
 const installAck = document.getElementById('install-ack');
 function refreshInstall() {
   const board = document.querySelector('input[name="board"]:checked');
   const variant = document.querySelector('input[name="variant"]:checked');
+  const boardNames = { 28: '2.8 inch · ESP32-2432S028', 35: '3.5 inch · ESP32-3248S035' };
+  const variantNames = { games: 'Player + starter games', courses: 'Player + Starter courses', player: 'Player only' };
+  document.getElementById('install-selection').textContent = board
+    ? `${boardNames[board.value]} — ${variantNames[variant.value]}`
+    : 'Select your board in step 1 before installing.';
   installSlot.replaceChildren();
   if (board && installAck.checked) {
     mount(installSlot, MANIFESTS[board.value][variant ? variant.value : 'games']);
@@ -35,7 +46,7 @@ function refreshInstall() {
   }
   const p = document.createElement('p');
   p.className = 'small';
-  p.textContent = board ? 'Tick the box to show the Install button.' : 'Pick a board and tick the box to show the Install button.';
+  p.textContent = board ? 'Check the confirmation box to show the install button.' : 'Pick a board and check the confirmation box to show the install button.';
   installSlot.append(p);
 }
 for (const r of document.querySelectorAll('input[name="board"], input[name="variant"]')) r.addEventListener('change', refreshInstall);
@@ -50,7 +61,7 @@ ack.addEventListener('change', () => {
     otherSlot.replaceChildren();
     const p = document.createElement('p');
     p.className = 'small';
-    p.textContent = 'Tick the box to show the Install button.';
+    p.textContent = 'Check the confirmation box to show the install button.';
     otherSlot.append(p);
   }
 });
@@ -64,12 +75,12 @@ function select(tab, focus) {
     t.tabIndex = on ? 0 : -1;
     document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
   }
+  history.replaceState(null, '', '#' + tab.id.replace('tab-', ''));
   if (focus) tab.focus();
 }
 for (const t of tabs) {
   t.addEventListener('click', () => {
     select(t, false);
-    history.replaceState(null, '', '#' + t.id.replace('tab-', ''));
   });
   t.addEventListener('keydown', (e) => {
     const i = tabs.indexOf(t);
@@ -79,5 +90,18 @@ for (const t of tabs) {
     select(tabs[(next + tabs.length) % tabs.length], true);
   });
 }
-const start = tabs.find((t) => '#' + t.id.replace('tab-', '') === location.hash);
-if (start) select(start, false);
+function selectFromHash(focus = false) {
+  const tab = tabs.find((t) => '#' + t.id.replace('tab-', '') === location.hash);
+  if (tab) select(tab, focus);
+}
+window.addEventListener('hashchange', () => selectFromHash(true));
+// Follow in-page tab links even if the destination hash is already selected.
+for (const link of document.querySelectorAll('a[href^="#"]')) {
+  const tab = tabs.find((t) => '#' + t.id.replace('tab-', '') === link.getAttribute('href'));
+  if (!tab) continue;
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    select(tab, true);
+  });
+}
+selectFromHash();
