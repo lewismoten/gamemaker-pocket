@@ -152,14 +152,18 @@ struct Geo {
 };
 // The 2.8 inch board draws through sg::SoftGfx, whose text sizes are whole numbers: its sizes here are 1 or 2.
 #ifdef POCKET_CYD28
-constexpr Geo G = {32, 34, 32, 1.0f, 34, 41, 32, 40, 32, 1.0f, 1.0f, 156, 36, 1, 2, 198, 238, 150};
+// 36 px chips and tabs on 320 x 240 (Controls drops the preview there: its rows are name-beside-chips, four a page and a More row).
+constexpr Geo G = {40, 52, 36, 1.0f, 42, 41, 32, 40, 36, 1.0f, 1.0f, 156, 36, 1, 2, 202, 238, 160};
+constexpr bool PREVIEW = false;
 #else
-constexpr Geo G = {40, 56, 36, 2.0f, 46, 52, 34, 48, 40, 1.5f, 1.5f, 282, 46, 2, 5, 270, 316, 206};
+// 40 px chips and tabs on 480 x 320; Controls keeps the live pad preview.
+constexpr Geo G = {44, 62, 40, 2.0f, 48, 54, 40, 48, 40, 1.5f, 1.5f, 282, 48, 2, 5, 270, 316, 206};
+constexpr bool PREVIEW = true;
 #endif
 constexpr int W = scr::W, H = scr::H;
 inline int pvW() { return scr::W * G.pvNum / G.pvDen; }
 inline int pvH() { return scr::VIEW_H * G.pvNum / G.pvDen; }
-inline bool stacked(Tab t) { return t == T_CONTROLS; }
+inline bool stacked(Tab t) { return PREVIEW && t == T_CONTROLS; }
 inline int colX1(Tab t) { return stacked(t) ? G.pvX - 6 : W - 4; }
 
 // The items of a tab, in order (the 2.8 inch board adds Calibrate, the status LED and its panel setup).
@@ -167,7 +171,8 @@ inline int tabItems(Tab t, Item* out) {
   int n = 0;
   switch (t) {
     case T_CONTROLS:
-      for (Item i : {I_HAND, I_PAD, I_DEAD, I_POS, I_JUMP, I_ARCS, I_WEDGE, I_STYLUS, I_STICKY, I_PALM}) out[n++] = i;
+      if (PREVIEW) { for (Item i : {I_HAND, I_PAD, I_DEAD, I_POS, I_JUMP, I_ARCS, I_WEDGE, I_STYLUS, I_STICKY, I_PALM}) out[n++] = i; }
+      else for (Item i : {I_HAND, I_PAD, I_POS, I_JUMP, I_DEAD, I_ARCS, I_WEDGE, I_STYLUS, I_STICKY, I_PALM}) out[n++] = i;
       if (scr::SMALL) out[n++] = I_CAL;
       out[n++] = I_TRY;
       break;
@@ -182,6 +187,7 @@ inline int tabItems(Tab t, Item* out) {
 }
 inline int perPage(Tab t) {  // as many rows as fit above the bottom edge
   if (t == T_CARD) return 1;
+  if (!PREVIEW && t == T_CONTROLS) return 4;  // the fifth slot is the More button
   int step = stacked(t) ? G.stackStep : G.lineStep, rowH = stacked(t) ? (int)(8 * G.nameSize) + 1 + G.stackChipH : G.lineChipH;
   return (H - G.y0 - rowH) / step + 1;
 }
@@ -218,8 +224,8 @@ inline Box chipBox(const Box& strip, int n, int k) {
   int w = (strip.x1 - strip.x0 - gap * (n - 1)) / n;
   return {strip.x0 + k * (w + gap), strip.y0, strip.x0 + k * (w + gap) + w, strip.y1};
 }
-inline Box previewBox() { return {G.pvX, G.pvY, G.pvX + pvW(), G.pvY + pvH()}; }
-inline Box moreBox() { return {G.pvX, G.moreY0, G.pvX + pvW(), G.moreY1}; }
+inline Box previewBox() { return PREVIEW ? Box{G.pvX, G.pvY, G.pvX + pvW(), G.pvY + pvH()} : Box{0, 0, 0, 0}; }
+inline Box moreBox() { return PREVIEW ? Box{G.pvX, G.moreY0, G.pvX + pvW(), G.moreY1} : Box{W * 36 / 100, G.moreY0, W - 4, G.moreY1}; }
 
 // ---- what a touch is on ---------------------------------------------------------------------------------------------
 enum Kind : uint8_t { K_NONE, K_BACK, K_TAB, K_CHIP, K_MORE, K_PREVIEW };
@@ -230,7 +236,7 @@ inline Hit hit(const View& v, int x, int y) {
   for (int t = 0; t < T_COUNT; t++)
     if (tabBox(t).has(x, y)) { h.kind = K_TAB; h.tab = t; h.box = tabBox(t); return h; }
   if (v.tab == T_CONTROLS) {
-    if (previewBox().has(x, y)) { h.kind = K_PREVIEW; h.box = previewBox(); return h; }
+    if (PREVIEW && previewBox().has(x, y)) { h.kind = K_PREVIEW; h.box = previewBox(); return h; }
     if (pages(v.tab) > 1 && moreBox().has(x, y)) { h.kind = K_MORE; h.box = moreBox(); return h; }
   }
   Item it[12];
@@ -276,7 +282,7 @@ inline float fitSize(const char* s, int w, float size) {
 template <class G_> void bar(G_& g, const View& v) {
   g.fillRect(0, 0, W, G.barH, C_BLACK);
   Box b = backBox();
-  ovl::button(g, b.x0, b.y0, b.x1, b.y1, "<", false, C_DARK, G.tabSize);
+  ovl::button(g, b.x0, b.y0, b.x1, b.y1, "Back", false, C_DARK, G.tabSize);
   for (int t = 0; t < T_COUNT; t++) {
     Box tb = tabBox(t);
     bool on = t == v.tab;
@@ -396,13 +402,15 @@ template <class G_> void screen(G_& g, const View& v, const Values& vals, const 
   for (int k = 0; k < n; k++) row(g, v.tab, k, it[k], vals, it[k] == I_RESCAN && v.fromPause);
   if (v.tab == T_CARD) cardLines(g, card);
   if (v.tab == T_CONTROLS) {
-    preview(g, L, nd, dirs, btn, vals.s.floatPad && !held && !dirs ? ctl::LOOK_OFF : ctl::LOOK_FULL);
-    previewNote(g, v, held);
+    if (PREVIEW) {
+      preview(g, L, nd, dirs, btn, vals.s.floatPad && !held && !dirs ? ctl::LOOK_OFF : ctl::LOOK_FULL);
+      previewNote(g, v, held);
+    }
     if (pages(v.tab) > 1) {
       Box m = moreBox();
       char t[16];
       snprintf(t, sizeof t, "More %d/%d", v.page + 1, pages(v.tab));
-      ovl::button(g, m.x0, m.y0, m.x1, m.y1, t, false, C_DARK, 2);
+      ovl::button(g, m.x0, m.y0, m.x1, m.y1, t, false, C_DARK, PREVIEW ? 2 : 1);
     }
   }
 }

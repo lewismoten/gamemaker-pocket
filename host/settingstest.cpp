@@ -1,6 +1,6 @@
 // Mac test and renders for the Settings screen (src/settingsdraw.h, through src/pressrect.h as the board taps it): every tab
 // and page at both hands, the Controls preview lit by a real touch through src/controls.h, and Near pad + Raised.
-// Checks: every button (Back, tabs, chips, More) is at least 32 x 32, on screen, apart from the others and found by the hit
+// Checks: every button (Back, tabs, chips, More) is at least 36 x 36, on screen, apart from the others and found by the hit
 // table; every label fits its button and every row name its column; every row of a tab is on one of its pages.
 //   settingstest [out dir]      build with -lz; add -DPOCKET_CYD28 for the 320 x 240 board. PNGs: settings-<w>-<tab>-p<page>-<hand>.png
 #include <stdio.h>
@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
   }
   for (size_t i = 0; i < bar.size(); i++) {
     const st::Box& b = bar[i];
-    if (b.x1 - b.x0 < 32 || b.y1 - b.y0 < 32 || b.x0 < 0 || b.x1 > scr::W || b.y1 > st::G.barH) fail("bar button small or off screen");
+    if (b.x1 - b.x0 < 36 || b.y1 - b.y0 < 36 || b.x0 < 0 || b.x1 > scr::W || b.y1 > st::G.barH) fail("bar button small or off screen");
     for (size_t j = i + 1; j < bar.size(); j++) if (overlap(b, bar[j])) fail("bar buttons overlap");
   }
   for (int t = 0; t < st::T_COUNT; t++) {
@@ -95,14 +95,19 @@ int main(int argc, char** argv) {
         ctx.H = scr::H;
         ctx.settings = v;
         std::vector<st::Box> boxes = bar;
-        if (t == st::T_CONTROLS) {
+        if (t == st::T_CONTROLS && st::PREVIEW) {
           st::Box p = st::previewBox();
           if (p.x1 > scr::W || p.y1 > st::G.moreY0) fail("preview off screen or over More");
           prs::Rect r;
           if (prs::under(ctx, (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, r)) fail("the preview counts as a button");
           if (st::hit(v, (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2).kind != st::K_PREVIEW) fail("the preview is not found");
           boxes.push_back(p);
-          if (st::pages(v.tab) > 1) boxes.push_back(st::moreBox());
+        }
+        if (t == st::T_CONTROLS && st::pages(v.tab) > 1) {
+          st::Box m = st::moreBox();
+          if (m.x1 - m.x0 < 36 || m.y1 - m.y0 < 36 || m.y1 > scr::H) fail("More is small or off screen");
+          if (st::hit(v, (m.x0 + m.x1) / 2, (m.y0 + m.y1) / 2).kind != st::K_MORE) fail("More is not found");
+          boxes.push_back(m);
         }
         st::Item it[12];
         int k = st::pageItems(v, it);
@@ -118,7 +123,7 @@ int main(int argc, char** argv) {
             char lab[24];
             st::chipLabel(it[i], j, lab, sizeof lab);
             std::string nm = std::string(st::info(it[i]).name) + " / " + lab;
-            if (b.x1 - b.x0 < 32 || b.y1 - b.y0 < 32) fail("chip under 32 x 32: " + nm);
+            if (b.x1 - b.x0 < 36 || b.y1 - b.y0 < 36) fail("chip under 36 x 36: " + nm);
             if (b.x0 < 0 || b.x1 > scr::W || b.y1 > scr::H) fail("chip off screen: " + nm);
             if ((int)strlen(lab) * 6 > b.x1 - b.x0 - 6) fail("chip label does not fit: " + nm);
             prs::Rect r;
