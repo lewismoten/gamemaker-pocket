@@ -13,6 +13,8 @@ namespace textdatum_t { constexpr int middle_center = 4, top_left = 0; }
 #include "dosmenudraw.h"
 #include "picker_draw.h"
 #include "softgfx.h"
+#include "gmcards.h"
+#include <zlib.h>
 
 struct HC : Canvas {
   HC(int w, int h) : Canvas(w, h) {}
@@ -20,6 +22,32 @@ struct HC : Canvas {
 };
 static uint16_t rgb565(int r6, int g6, int b6) { auto v8 = [](int c) { c &= 63; return (c << 2) | (c >> 4); }; int r = v8(r6), g = v8(g6), b = v8(b6); return (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)); }
 static void setPal(uint16_t* pal, const uint8_t* p) { for (int i = 0; i < 256; i++) pal[i] = carddraw::native(rgb565(p[i * 3], p[i * 3 + 1], p[i * 3 + 2])); }
+static std::vector<uint8_t> pakBytes;
+static bool inflateRaw(const uint8_t* src, size_t n, uint8_t* dst, size_t cap) {
+  z_stream z = {};
+  if (inflateInit2(&z, -15) != Z_OK) return false;
+  z.next_in = (Bytef*)src; z.avail_in = (uInt)n; z.next_out = dst; z.avail_out = (uInt)cap;
+  int r = inflate(&z, Z_FINISH);
+  bool ok = r == Z_STREAM_END && z.total_out == cap;
+  inflateEnd(&z);
+  return ok;
+}
+static uint8_t* readRange(size_t off, size_t len) {
+  if (off + len > pakBytes.size()) return nullptr;
+  uint8_t* p = (uint8_t*)malloc(len + 1);
+  memcpy(p, pakBytes.data() + off, len);
+  return p;
+}
+static std::vector<uint8_t> slurp(const std::string& path) {
+  std::vector<uint8_t> v;
+  FILE* f = fopen(path.c_str(), "rb");
+  if (!f) return v;
+  uint8_t b[4096];
+  size_t n;
+  while ((n = fread(b, 1, sizeof b, f)) > 0) v.insert(v.end(), b, b + n);
+  fclose(f);
+  return v;
+}
 static int fails = 0;
 static void check(bool ok, const char* what) { if (!ok) { fails++; printf("FAIL %s\n", what); } }
 
@@ -85,6 +113,75 @@ int main(int argc, char** argv) {
     g.setCursor(8, (titleH - 16) / 2);
     g.print(scr::SMALL ? "Top Ten! Number 2" : "Congratulations! You are number 2");
     writePng(out + "/name-" + w + (typed ? "-typed" : "") + ".png", g.W, g.H, rgbOf(g));
+  }
+  if (argc > 4) {  // a game packed for the card (pocketData.ts --out): <base>.cfg and <base>.pak, its menu, credits and Top Ten pictures
+    std::string base = argv[4];
+    std::vector<uint8_t> cv = slurp(base + ".cfg");
+    pakBytes = slurp(base + ".pak");
+    std::string cfgText(cv.begin(), cv.end());
+    gm::Assets assets;
+    assets.inflate = inflateRaw;
+    auto first = [&](const char* where, int skip) -> uint8_t* {
+      gm::Card cards[gm::MAX_CARDS];
+      int n = gm::cardsOf(cfgText.c_str(), where, cards, gm::MAX_CARDS);
+      for (int i = 0, seen = 0; i < n; i++)
+        if ((cards[i].kind == 'g' || cards[i].kind == 'p') && seen++ == skip) return gm::loadCardPicture(assets, readRange, cards[i]);
+      return nullptr;
+    };
+    auto show = [&](HC& g, const uint8_t* p) { setPal(pal, p); carddraw::pushPicture(g, p + 768, pal, band, 30); };
+    uint8_t* m = first("m", 0);
+    check(m != nullptr, "the pack has a menu picture");
+    if (m) {
+      HC g(scr::W, scr::H);
+      uint8_t under[gmmenu::M_COUNT][gm::MARK_W * gm::MARK_H];
+      gm::menuUnder(m + 768, under);
+      gm::drawGameMenu(m, font.data(), title);
+      gm::drawMenuMarker(m + 768, 1, true, gm::dosBlue(m), under);
+      show(g, m);
+      cx::draw(g, scr::W);
+      for (int k = 0; k < gmmenu::K_COUNT; k++) { int x0, y0, x1, y1; gmmenu::keyRect(k, x0, y0, x1, y1); pk::drawActionButton(g, x0, y0, x1, y1, gmmenu::keyLabel(k)); }
+      writePng(out + "/dosmenu-pic-" + w + ".png", g.W, g.H, rgbOf(g));
+      free(m);
+    }
+    for (int k = 0; k < 3; k++) {  // credits pictures (a patch card prints as the picture it makes)
+      uint8_t* c = first("c", k);
+      if (!c) break;
+      HC g(scr::W, scr::H);
+      show(g, c);
+      cx::draw(g, scr::W);
+      writePng(out + "/credits-" + w + "-" + std::to_string(k + 1) + ".png", g.W, g.H, rgbOf(g));
+      free(c);
+    }
+    uint8_t* b = first("b", 0);
+    check(b != nullptr, "the pack has a Top Ten background");
+    if (b) {
+      gm::HiTable t;
+      memset(&t, 0, sizeof t);
+      const char* names[] = {"DOC LEO", "KIT", "TEDDY", "GWINN", "AVA"};
+      long sc[] = {48200, 31050, 22900, 9100, 640};
+      for (int i = 4; i >= 0; i--) { int p = gm::hiInsert(t, sc[i]); gm::hiSetName(t, p, names[i]); }
+      std::vector<uint8_t> copy(b, b + gm::PIC_BYTES);
+      {
+        HC g(scr::W, scr::H);
+        gm::drawTopTen(b, font.data(), t, 12345);
+        show(g, b);
+        cx::draw(g, scr::W);
+        writePng(out + "/topten-bg-" + w + ".png", g.W, g.H, rgbOf(g));
+      }
+      {  // the name entry over the same picture
+        HC g(scr::W, scr::H);
+        int titleH = pk::searchTitleH(scr::W);
+        show(g, copy.data());
+        pk::drawKeyboard(g, scr::W, scr::H, titleH, "DOC LEO", "Type your name", false);
+        g.fillRect(0, 0, scr::W, titleH, 0x10A5);
+        g.setTextSize(2);
+        g.setTextColor(pk::C_YELLOW);
+        g.setCursor(8, (titleH - 16) / 2);
+        g.print(scr::SMALL ? "Top Ten! Number 2" : "Congratulations! You are number 2");
+        writePng(out + "/name-bg-" + w + ".png", g.W, g.H, rgbOf(g));
+      }
+      free(b);
+    }
   }
   printf(fails ? "dosmenushots FAILED\n" : "dosmenushots ok\n");
   return fails != 0;

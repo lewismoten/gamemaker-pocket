@@ -106,8 +106,8 @@ template <class G> void drawSearchHeader(G& tft, int W, bool all) {
   drawButton(tft, SEARCH_SCOPE_X0, cx::INSET, searchScopeX1(W), searchTitleH(W), all ? "All games" : "This category");
   cx::draw(tft, W);
 }
-template <class G> void drawKeyboard(G& tft, int W, int H, int titleH, const char* text, const char* hint = "Type a title") {
-  tft.fillRect(0,0,W,H,C_BLACK);
+template <class G> void drawKeyboard(G& tft, int W, int H, int titleH, const char* text, const char* hint = "Type a title", bool clear = true) {
+  if (clear) tft.fillRect(0,0,W,H,C_BLACK);
   drawSearchText(tft, titleH, text, nullptr, hint);
   const char* keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   int top = titleH + 26, step = (H - top - 38) / 4;

@@ -1386,6 +1386,10 @@ static void showCards(const char* where) {
       cardsShown++;
       fadePalette(black, pic, pic + 768);
       waitTap(c.pause);
+    } else if (c.kind == 'f' && where[0] == 'c' && !where[1]) {  // an animated credits page: its frames with the pack's pause after the last
+      free(pic);
+      pic = nullptr;
+      playFli(c);
     } else if (c.kind == 't' && pic) {
       if (!fontData) { size_t fn = 0; fontData = readFileIn(LittleFS, "", "font.bin", &fn); if (fontData && fn < 95 * 8) { free(fontData); fontData = nullptr; } }
       size_t tn = 0;
@@ -1847,6 +1851,14 @@ static uint8_t* menuBackground() {
   if (p) gm::defaultMenuScreen(p);
   return p;
 }
+// The Top Ten's own background (a `card b` line, scene 0 slot 8): malloc'd PIC_BYTES, or null when the game has none.
+static uint8_t* scoreBackground() {
+  gm::Card cards[4];
+  int n = gm::cardsOfFile(cfgLines, assets.cfgName, "b", cards, 4);
+  for (int i = 0; i < n; i++)
+    if (cards[i].kind == 'g' || cards[i].kind == 'p') { uint8_t* p = gm::loadCardPicture(assets, readPak, cards[i]); if (p) return p; }
+  return nullptr;
+}
 static void menuChrome(int choice) {  // the Close X and the key strip, over the picture
   cx::draw(tft, scr::W);
   for (int k = 0; k < gmmenu::K_COUNT; k++) { int x0, y0, x1, y1; gmmenu::keyRect(k, x0, y0, x1, y1); pk::drawActionButton(tft, x0, y0, x1, y1, gmmenu::keyLabel(k)); }
@@ -1870,7 +1882,7 @@ static void showTopTen(uint8_t* pic, long latest) {
 }
 // CheckHighScores: when the score makes the Top Ten, a name entry on the Search keyboard (vowels green, Space, Del and Done blue), then
 // the table is saved. Returns the place (0: not in).
-static int highScoreEntry(long score) {
+static int highScoreEntry(long score, const uint8_t* bg) {
   gm::HiTable t;
   hiLoad(t);
   int place = gm::hiInsert(t, score);
@@ -1878,8 +1890,9 @@ static int highScoreEntry(long score) {
   Serial.printf("SCREEN name place %d score %ld\n", place, score);
   char name[gm::HIS_NAME_MAX + 1] = "";
   const int titleH = pk::searchTitleH(scr::W), top = titleH + 26, step = (scr::H - top - 38) / 4;
-  tft.fillScreen(C_BLACK);
-  pk::drawKeyboard(tft, scr::W, scr::H, titleH, name, "Type your name");
+  if (bg) { setPalette6(bg); pushPicture(bg + 768); }  // the game's Top Ten picture behind the keys
+  else tft.fillScreen(C_BLACK);
+  pk::drawKeyboard(tft, scr::W, scr::H, titleH, name, "Type your name", !bg);
   char head[40];
   snprintf(head, sizeof head, scr::SMALL ? "Top Ten! Number %d" : "Congratulations! You are number %d", place);
   tft.fillRect(0, 0, scr::W, titleH, C_BLACK);
@@ -1995,7 +2008,9 @@ static bool dosMenu(int g, bool intro) {
           waitTap(10);
         }
       }
-    } else if (act == gmmenu::M_CREDITS) {  // the credits picture (slot 7) is not packed: PLAYGAME's own line for a game without one
+    } else if (act == gmmenu::M_CREDITS) {  // the credits (slot 7, `card c`, SD packs only): PLAYGAME's own line for a game without one
+      gm::Card cc[1];
+      if (gm::cardsOfFile(cfgLines, assets.cfgName, "c", cc, 1) > 0) { tft.fillScreen(C_BLACK); readingPages = true; showCards("c"); readingPages = false; continue; }
       uint8_t* p2 = menuBackground();
       if (p2) {
         setPalette6(p2);
@@ -2005,7 +2020,8 @@ static bool dosMenu(int g, bool intro) {
         waitTap(10);
       }
     } else if (act == gmmenu::M_SCORES) {
-      showTopTen(menuBackground(), -1);
+      uint8_t* b = scoreBackground();
+      showTopTen(b ? b : menuBackground(), -1);
     }
     spk::stop();
   }
@@ -2019,9 +2035,17 @@ static bool dosMenu(int g, bool intro) {
 static bool gameOverScores(long score) {
   loadGameList();  // the catalog is let go while a game plays: the menu needs it for the title
   int g = pk::selection(games, ngames, activeGame.uid);
-  highScoreEntry(score);
-  if (g < 0) return false;
-  showTopTen(nullptr, score);
+  snprintf(assets.cfgName, sizeof assets.cfgName, "%s.cfg", fileOf(activeGame));
+  bool have = selectGame(activeGame);
+  bool card = have && curFs == &SD;
+  if (card) mountSD();
+  uint8_t* bg = have ? scoreBackground() : nullptr;
+  highScoreEntry(score, bg);
+  free(bg);
+  bg = have ? scoreBackground() : nullptr;
+  if (card) unmountSD();
+  if (g < 0) { free(bg); return false; }
+  showTopTen(bg, score);
   return dosMenu(g, false);
 }
 static void serialCommand(const char* cmd) {
