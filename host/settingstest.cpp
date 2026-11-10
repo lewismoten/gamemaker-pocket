@@ -114,8 +114,16 @@ int main(int argc, char** argv) {
         if (t == st::T_CONTROLS && st::pages(v.tab) > 1) {
           st::Box m = st::moreBox();
           if (m.x1 - m.x0 < 36 || m.y1 - m.y0 < 36 || m.y1 > scr::H) fail("More is small or off screen");
-          if (st::hit(v, (m.x0 + m.x1) / 2, (m.y0 + m.y1) / 2).kind != st::K_MORE) fail("More is not found");
-          boxes.push_back(m);
+          st::Box nb = st::nextBox(), pv = st::prevBox();
+          if (nb.x1 - nb.x0 < 36 || pv.x1 - pv.x0 < 36 || nb.y1 - nb.y0 < (scr::SMALL ? 36 : 40)) fail("Prev or Next is small");
+          st::View first = v; first.page = 0;
+          if (st::hit(first, (nb.x0 + nb.x1) / 2, (nb.y0 + nb.y1) / 2).kind != st::K_MORE) fail("Next is not found");
+          if (st::hit(first, (pv.x0 + pv.x1) / 2, (pv.y0 + pv.y1) / 2).kind != st::K_NONE) fail("Prev works on the first page");
+          st::View last = v; last.page = st::pages(v.tab) - 1;
+          if (st::hit(last, (nb.x0 + nb.x1) / 2, (nb.y0 + nb.y1) / 2).kind != st::K_NONE) fail("Next works on the last page");
+          if (st::hit(last, (pv.x0 + pv.x1) / 2, (pv.y0 + pv.y1) / 2).kind != st::K_PREV) fail("Prev is not found");
+          boxes.push_back(pv);
+          boxes.push_back(nb);
         }
         st::Item it[16];
         int k = st::pageItems(v, it);

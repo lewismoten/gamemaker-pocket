@@ -31,23 +31,28 @@ template <class G> void button(G& tft, int x0, int y0, int x1, int y1, const cha
   tft.setTextDatum(textdatum_t::top_left);
 }
 
-// ---- the pause menu: a title line (the game and its level), then six buttons in two columns of three ----
-enum { PA_RESUME, PA_RESTART_LEVEL, PA_RESTART_GAME, PA_HELP, PA_SETTINGS, PA_QUIT, PA_COUNT };
+// ---- the pause menu: a title line (the game and its level), then eight buttons in two columns of four ----
+// Left: play (Resume, Save game, Load game, Restart level); right: the rest. Save game and Load game are PLAYGAME's F5 and F6.
+enum { PA_RESUME, PA_SAVE, PA_LOAD, PA_RESTART_LEVEL, PA_RESTART_GAME, PA_HELP, PA_SETTINGS, PA_QUIT, PA_COUNT };
 inline const char* pauseItem(int i) {
-  static const char* const names[PA_COUNT] = {"Resume", "Restart level", "Restart game", "How to play", "Settings", "Quit to library"};
+  static const char* const names[PA_COUNT] = {"Resume", "Save game", "Load game", "Restart level", "Restart game", "How to play", "Settings", "Quit to library"};
   return names[i];
 }
-// Restart level, Restart game and (the Settings option Confirm Quit, on by default) Quit to library need a second tap: the first
-// arms the button ("Tap again to restart", or "Tap to restart" where the long form does not fit), for 3 seconds or until another
+// Restart level and Restart game always need a second tap. With the Settings option Confirm Quit (on by default) so do Quit to
+// library, Load game (it replaces the game in play) and Save game when a saved game is already there (it is written over). The first
+// tap arms the button ("Tap again to restart", or "Tap to restart" where the long form does not fit), for 3 seconds or until another
 // button is tapped. Resume and the others act at once.
 constexpr uint32_t PAUSE_ARM_MS = 3000;
-inline bool pauseNeedsConfirm(int i, bool confirmQuit = true) { return i == PA_RESTART_LEVEL || i == PA_RESTART_GAME || (i == PA_QUIT && confirmQuit); }
+inline bool pauseNeedsConfirm(int i, bool confirmQuit = true, bool saved = false) {
+  return i == PA_RESTART_LEVEL || i == PA_RESTART_GAME || (confirmQuit && (i == PA_QUIT || i == PA_LOAD || (i == PA_SAVE && saved)));
+}
 enum { ARM_NONE, ARM_ARMED, ARM_ACT };  // what a tap did: nothing, armed a restart, or should do its action
 struct PauseArm {
   int armed = -1;
   uint32_t at = 0;
-  int tap(int item, uint32_t now, bool confirmQuit = true) {  // item: the button under the tap (-1: none)
-    if (!pauseNeedsConfirm(item, confirmQuit)) { armed = -1; return item < 0 ? ARM_NONE : ARM_ACT; }
+  int tap(int item, uint32_t now, bool confirmQuit = true, bool saved = false) {  // item: the button under the tap (-1: none)
+    if (item == PA_LOAD && !saved) { armed = -1; return ARM_NONE; }  // nothing to load
+    if (!pauseNeedsConfirm(item, confirmQuit, saved)) { armed = -1; return item < 0 ? ARM_NONE : ARM_ACT; }
     if (armed == item && now - at <= PAUSE_ARM_MS) { armed = -1; return ARM_ACT; }
     armed = item; at = now;
     return ARM_ARMED;
@@ -59,18 +64,25 @@ struct PauseArm {
   }
 };
 struct PauseGeom { int boxX, boxY, boxW, boxH, x0, y0, colW, colGap, step, h, titleY, titleSize; float textSize; };
-constexpr PauseGeom PAUSE = scr::SMALL ? PauseGeom{4, 4, 312, 232, 12, 28, 144, 8, 68, 60, 11, 1, 1.5f}
-                                       : PauseGeom{16, 16, 448, 288, 28, 54, 206, 12, 80, 70, 26, 2, 2.f};
-inline const char* pauseLabel(int i, bool armed, int colW, float textSize) {
+constexpr PauseGeom PAUSE = scr::SMALL ? PauseGeom{4, 4, 312, 232, 12, 40, 144, 8, 47, 42, 11, 1, 1.5f}
+                                       : PauseGeom{16, 16, 448, 288, 28, 54, 206, 12, 58, 52, 26, 2, 2.f};
+// What a button says while it waits for its second tap, the long form if it fits and the short one if not.
+inline const char* pauseLabel(int i, bool armed, int colW, float textSize, bool saved = true) {
+  if (i == PA_LOAD && !saved) return "No saved game";
   if (!armed) return pauseItem(i);
-  bool quit = i == PA_QUIT;
-  const char* full = quit ? "Tap again to quit" : "Tap again to restart";
-  return (int)(strlen(full) * 6 * textSize) + 8 <= colW ? full : quit ? "Tap to quit" : "Tap to restart";
+  const char *full, *shortForm;
+  switch (i) {
+    case PA_QUIT: full = "Tap again to quit"; shortForm = "Tap to quit"; break;
+    case PA_SAVE: full = "Tap to overwrite"; shortForm = "Overwrite?"; break;
+    case PA_LOAD: full = "Tap again to load"; shortForm = "Tap to load"; break;
+    default: full = "Tap again to restart"; shortForm = "Tap to restart"; break;
+  }
+  return (int)(strlen(full) * 6 * textSize) + 8 <= colW ? full : shortForm;
 }
-// Button i's rectangle: the left column is play (Resume, Restart level, Restart game), the right the rest.
+// Button i's rectangle: the left column is play (Resume, Save game, Load game, Restart level), the right the rest.
 inline void pauseCell(int i, int& x0, int& y0, int& x1, int& y1) {
-  x0 = PAUSE.x0 + i / 3 * (PAUSE.colW + PAUSE.colGap);
-  y0 = PAUSE.y0 + i % 3 * PAUSE.step;
+  x0 = PAUSE.x0 + i / 4 * (PAUSE.colW + PAUSE.colGap);
+  y0 = PAUSE.y0 + i % 4 * PAUSE.step;
   x1 = x0 + PAUSE.colW;
   y1 = y0 + PAUSE.h;
 }
@@ -84,13 +96,13 @@ inline int pauseHit(int x, int y) {
   return -1;
 }
 // The menu over the paused game: `game` (its title, cut to fit) at the left of the title line and "Level n" at the right.
-template <class G> void pauseMenu(G& tft, const char* game, int level, int armed = -1) {
+template <class G> void pauseMenu(G& tft, const char* game, int level, int armed = -1, bool saved = true) {
   const PauseGeom& p = PAUSE;
   tft.fillRect(p.boxX, p.boxY, p.boxW, p.boxH, C_BLACK);
   tft.drawRect(p.boxX, p.boxY, p.boxW, p.boxH, C_WHITE);
   char lv[16], name[48];
   snprintf(lv, sizeof lv, "Level %d", level + 1);
-  int right = p.boxX + p.boxW - (p.x0 - p.boxX);  // where "Level n" ends
+  int right = cx::box(scr::W).x0 - 4;  // where "Level n" ends: left of the Close X (it resumes the game)
   int cw = 6 * p.titleSize, room = (right - p.x0) / cw - (int)strlen(lv) - 2;
   snprintf(name, sizeof name, "%s", game ? game : "");
   if ((int)strlen(name) > room && room > 3) { name[room - 3] = 0; strcat(name, "..."); }
@@ -102,11 +114,24 @@ template <class G> void pauseMenu(G& tft, const char* game, int level, int armed
   tft.setTextColor(C_YELLOW, C_BLACK);
   tft.setCursor(right - (int)strlen(lv) * cw, p.titleY);
   tft.print(lv);
+  cx::draw(tft, scr::W);
   for (int i = 0; i < PA_COUNT; i++) {
     int x0, y0, x1, y1;
     pauseCell(i, x0, y0, x1, y1);
-    button(tft, x0, y0, x1, y1, pauseLabel(i, i == armed, p.colW, p.textSize), i == armed, C_DARK, p.textSize);
+    button(tft, x0, y0, x1, y1, pauseLabel(i, i == armed, p.colW, p.textSize, saved), i == armed, C_DARK, p.textSize);
   }
+}
+
+// A one-line note in the strip at the foot of the pause box ("Game saved"), under the buttons.
+template <class G> void pauseNote(G& tft, const char* msg) {
+  const PauseGeom& p = PAUSE;
+  int y = p.y0 + 3 * p.step + p.h + 2, room = p.boxY + p.boxH - 2 - y;
+  int size = room >= 16 ? 2 : 1;
+  tft.fillRect(p.boxX + 1, y, p.boxW - 2, room, C_BLACK);
+  tft.setTextSize(size);
+  tft.setTextColor(C_YELLOW, C_BLACK);
+  tft.setCursor(p.x0, y + (room - 8 * size) / 2);
+  tft.print(msg);
 }
 
 // ---- How to play: the keys the game lists (its controls.json labels, packed as the .cfg's `key` lines) ----

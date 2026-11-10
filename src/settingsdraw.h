@@ -235,10 +235,16 @@ inline bool showsPreview(const View& v) { return v.tab == T_CONTROLS && (PREVIEW
 // 2.8 inch: the Preview button (left of More) and, on the Preview page, the wide Back to options button
 inline Box previewBtn() { return {4, G.moreY0, W * 36 / 100 - 4, G.moreY1}; }
 inline Box optionsBtn() { return {4, G.moreY0, W - 4, G.moreY1}; }
+// The pager row under the options: [Prev] 1/4 [Next]. Prev and Next are 36 px tall (2.8 inch) or 40 px (3.5 inch) and a third of the row
+// or more wide; at the first or last page the matching one is drawn gray and does nothing.
+inline Box prevBox();
+inline Box nextBox();
 inline Box moreBox() { return PREVIEW ? Box{G.pvX, G.moreY0, G.pvX + pvW(), G.moreY1} : Box{W * 36 / 100, G.moreY0, W - 4, G.moreY1}; }
+inline Box prevBox() { Box m = moreBox(); return {m.x0, m.y0, m.x0 + (m.x1 - m.x0) * 36 / 100, m.y1}; }
+inline Box nextBox() { Box m = moreBox(); return {m.x1 - (m.x1 - m.x0) * 36 / 100, m.y0, m.x1, m.y1}; }
 
 // ---- what a touch is on ---------------------------------------------------------------------------------------------
-enum Kind : uint8_t { K_NONE, K_BACK, K_TAB, K_CHIP, K_MORE, K_PREVIEW, K_PVOPEN, K_PVBACK };
+enum Kind : uint8_t { K_NONE, K_BACK, K_TAB, K_CHIP, K_MORE, K_PREV, K_PREVIEW, K_PVOPEN, K_PVBACK };
 struct Hit { Kind kind = K_NONE; int tab = 0; Item item = I_NONE; int chip = 0; Box box = {0, 0, 0, 0}; };
 inline Hit hit(const View& v, int x, int y) {
   Hit h;
@@ -249,7 +255,11 @@ inline Hit hit(const View& v, int x, int y) {
     if (showsPreview(v) && previewBox().has(x, y)) { h.kind = K_PREVIEW; h.box = previewBox(); return h; }
     if (!PREVIEW && v.preview) { if (optionsBtn().has(x, y)) { h.kind = K_PVBACK; h.box = optionsBtn(); } return h; }
     if (!PREVIEW && previewBtn().has(x, y)) { h.kind = K_PVOPEN; h.box = previewBtn(); return h; }
-    if (pages(v.tab) > 1 && moreBox().has(x, y)) { h.kind = K_MORE; h.box = moreBox(); return h; }
+    if (pages(v.tab) > 1 && !v.preview) {  // Prev and Next (K_MORE is Next); the first and last page leave one of them dead
+      if (prevBox().has(x, y) && v.page > 0) { h.kind = K_PREV; h.box = prevBox(); return h; }
+      if (nextBox().has(x, y) && v.page + 1 < pages(v.tab)) { h.kind = K_MORE; h.box = nextBox(); return h; }
+      if (moreBox().has(x, y)) return h;  // the page number: nothing
+    }
   }
   Item it[16];
   int n = pageItems(v, it);
@@ -298,6 +308,12 @@ template <class G_> void button(G_& g,int x0,int y0,int x1,int y1,const char* la
   g.fillRect(x0,y0,x1-x0,y1-y0,selected?C_YELLOW:backing);
   g.drawRect(x0,y0,x1-x0,y1-y0,selected?C_YELLOW:0x324C);
   text(g,(x0+x1-(int)(strlen(label)*6*size))/2,(y0+y1-(int)(8*size))/2,label,size,selected?C_BLACK:C_WHITE,selected?C_YELLOW:backing);
+}
+// Prev or Next of the pager; gray when it would do nothing.
+template <class G_> void pagerButton(G_& g, const Box& b, const char* label, bool on, float size) {
+  g.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, C_DARK);
+  g.drawRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, on ? C_WHITE : 0x324C);
+  text(g, (b.x0 + b.x1 - (int)(strlen(label) * 6 * size)) / 2, (b.y0 + b.y1 - (int)(8 * size)) / 2, label, size, on ? C_WHITE : C_GRAY, C_DARK);
 }
 template <class G_> void bar(G_& g, const View& v) {
   g.fillRect(0, 0, W, G.barH, 0x0863);
@@ -442,10 +458,14 @@ template <class G_> void screen(G_& g, const View& v, const Values& vals, const 
       button(g, o.x0, o.y0, o.x1, o.y1, "Preview", false, C_DARK, 1);
     }
     if (pages(v.tab) > 1 && !(v.preview && !PREVIEW)) {
-      Box m = moreBox();
+      Box m = moreBox(), pb = prevBox(), nb = nextBox();
       char t[16];
-      snprintf(t, sizeof t, "More %d/%d", v.page + 1, pages(v.tab));
-      button(g, m.x0, m.y0, m.x1, m.y1, t, false, C_DARK, PREVIEW ? 2 : 1);
+      float sz = PREVIEW ? 2 : 1;
+      snprintf(t, sizeof t, "%d/%d", v.page + 1, pages(v.tab));
+      pagerButton(g, pb, "Prev", v.page > 0, sz);
+      pagerButton(g, nb, "Next", v.page + 1 < pages(v.tab), sz);
+      g.fillRect(pb.x1, m.y0, nb.x0 - pb.x1, m.y1 - m.y0, C_BLACK);
+      text(g, (pb.x1 + nb.x0 - (int)(strlen(t) * 6 * sz)) / 2, (m.y0 + m.y1 - (int)(8 * sz)) / 2, t, sz, C_WHITE, C_BLACK);
     }
   }
 }

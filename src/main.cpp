@@ -20,6 +20,9 @@
 #include "carddraw.h"
 #include "fwid.h"
 #include "gmcfg.h"
+#include "gmsave.h"
+#include "gmhiscore.h"
+#include "gmmenu.h"
 #include "serialfs.h"
 #include "screen.h"
 #include "picker_draw.h"
@@ -1223,7 +1226,18 @@ static void drawSettings() {
 }
 
 static ovl::PauseArm pauseArm;
-static void drawPause() { Serial.println("SCREEN pause"); ovl::pauseMenu(tft, cfg.title, world.level, pauseArm.armed); }
+// ---- saved games (PLAYGAME's F5 and F6) and the Top Ten: one file each per game in LittleFS, named by a hash of the game's uid ----
+static void gameFilePath(char* out, size_t cap, const char* ext) { snprintf(out, cap, "/%08x.%s", (unsigned)pk::crc32(activeGame.uid, 16), ext); }
+static bool wrFile(void* u, const void* p, size_t n) { return ((File*)u)->write((const uint8_t*)p, n) == n; }
+static bool rdFile(void* u, void* p, size_t n) { return ((File*)u)->read((uint8_t*)p, n) == n; }
+static bool pauseSaved = false;  // the game has a saved game (the Load game button; Save game asks before writing over it)
+static void drawPause() {
+  Serial.println("SCREEN pause");
+  char path[24];
+  gameFilePath(path, sizeof path, "sav");
+  pauseSaved = LittleFS.exists(path);
+  ovl::pauseMenu(tft, cfg.title, world.level, pauseArm.armed, pauseSaved);
+}
 
 static uint32_t t0 = 0, ticksRun = 0;
 static int curGame = -1;
@@ -2438,6 +2452,49 @@ static bool menuTap(prs::Screen sc, int& tx, int& ty) {
   }
   return false;
 }
+// Save game (F5): the level's state in <hash>.sav, written beside the old one and swapped in, so a failed write keeps the old save.
+static void pauseNote(const char* msg) { ovl::pauseNote(tft, msg); }
+static void pauseSaveGame() {
+  char path[24], tmp[28];
+  gameFilePath(path, sizeof path, "sav");
+  snprintf(tmp, sizeof tmp, "%s.t", path);
+  if (LittleFS.totalBytes() - LittleFS.usedBytes() < 40000 && !LittleFS.exists(path)) { pauseNote("No room to save"); return; }
+  File f = LittleFS.open(tmp, "w");
+  bool ok = f && gm::saveWorld(world, wrFile, &f);
+  if (f) f.close();
+  if (ok) { LittleFS.remove(path); ok = LittleFS.rename(tmp, path); } else LittleFS.remove(tmp);
+  Serial.printf("SAVE %s\n", ok ? "ok" : "failed");
+  drawPause();
+  pauseNote(ok ? "Game saved" : "Could not save");
+}
+// Load game (F6): the saved level is entered fresh, then the saved state goes over it (what LoadGame does).
+static void pauseLoadGame() {
+  char path[24];
+  gameFilePath(path, sizeof path, "sav");
+  File f = LittleFS.open(path, "r");
+  gm::EntryState e;
+  bool ok = f && gm::saveCheck(rdFile, &f, f.size());
+  if (ok) { f.seek(0); ok = gm::saveReadEntry(rdFile, &f, e); }
+  if (f) f.close();
+  if (!ok) { Serial.println("LOAD damaged"); pauseNote("Saved game unreadable"); return; }
+  spk::stop();
+  world.releaseAll();
+  controls.reset();
+  assets.release();
+  ok = world.restore(e);
+  if (ok) { File g = LittleFS.open(path, "r"); ok = g && gm::loadWorld(world, rdFile, &g); if (g) g.close(); }
+  Serial.printf("LOAD %s level %d score %d\n", ok ? "ok" : "failed", world.level, world.score);
+  if (!ok) { message("Could not load"); delay(1500); enterPicker(); return; }
+  world.buildDrawList();
+  refreshPalette();
+  resumeSave(activeGame);
+  tft.fillScreen(C_BLACK);
+  fadeLevelIn();
+  t0 = millis();
+  ticksRun = 0;
+  mode = PLAYING;
+  wasDown = true;
+}
 static void pauseGame() {
   spk::stop();
   world.releaseAll();
@@ -2631,7 +2688,8 @@ void loop() {
           return;
         case st::K_PVOPEN: setView.preview = true; setView.last = st::I_NONE; drawSettings(); return;
         case st::K_PVBACK: setView.preview = false; drawSettings(); return;
-        case st::K_MORE: setView.page = (setView.page + 1) % st::pages(setView.tab); drawSettings(); return;
+        case st::K_MORE: if (setView.page + 1 < st::pages(setView.tab)) setView.page++; drawSettings(); return;
+        case st::K_PREV: if (setView.page > 0) setView.page--; drawSettings(); return;
         case st::K_CHIP: chooseSetting(h.item, h.chip); return;
         default: break;
       }
@@ -2646,7 +2704,8 @@ void loop() {
     if (pauseArm.expire(millis())) drawPause();
     if (menuTap(prs::SC_PAUSE, tx, ty)) {
       int hit = ovl::pauseHit(tx, ty), was = pauseArm.armed;
-      int act = pauseArm.tap(hit, millis(), settings.confirmQuit != 0);
+      if (cx::hit(scr::W, tx, ty)) hit = ovl::PA_RESUME;  // the Close X closes the menu
+      int act = pauseArm.tap(hit, millis(), settings.confirmQuit != 0, pauseSaved);
       if (act == ovl::ARM_ARMED) { drawPause(); wasDown = true; return; }
       if (act == ovl::ARM_NONE) { if (was >= 0) drawPause(); return; }
       switch (hit) {
@@ -2654,6 +2713,8 @@ void loop() {
           mode = PLAYING; world.releaseAll(); controls.reset(); last.valid = false; drawFrame(true); drawStrip();
           t0 = millis(); ticksRun = 0; wasDown = true;
           break;
+        case ovl::PA_SAVE: pauseSaveGame(); break;
+        case ovl::PA_LOAD: pauseLoadGame(); break;
         case ovl::PA_RESTART_LEVEL: restartLevel(); break;
         case ovl::PA_RESTART_GAME: if (!launchGame(curGame)) enterPicker(); break;
         case ovl::PA_HELP: Serial.println("SCREEN help"); mode = HELP_SCREEN; ovl::helpPage(tft, cfg); wasDown = true; break;

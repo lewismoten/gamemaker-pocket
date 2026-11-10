@@ -23,9 +23,9 @@ inline uint32_t saveCrc(uint32_t c, const void* data, size_t n) {  // running CR
 }
 
 namespace savedetail {
-struct Out { SaveWrite w; void* user; uint32_t crc = 0; bool ok = true;
+struct Out { SaveWrite w; void* user; uint32_t crc; bool ok; Out(SaveWrite w_, void* u) : w(w_), user(u), crc(0), ok(true) {}
   void put(const void* p, size_t n) { if (!ok) return; crc = saveCrc(crc, p, n); ok = w(user, p, n); } };
-struct In { SaveRead r; void* user; uint32_t crc = 0; bool ok = true;
+struct In { SaveRead r; void* user; uint32_t crc; bool ok; In(SaveRead r_, void* u) : r(r_), user(u), crc(0), ok(true) {}
   void get(void* p, size_t n) { if (!ok) return; ok = r(user, p, n); if (ok) crc = saveCrc(crc, p, n); } };
 // Runs of one byte: (count 1..255, value) pairs.
 inline void rlePut(Out& o, const uint8_t* a, int n) {
@@ -41,7 +41,7 @@ inline void rleGet(In& in, uint8_t* a, int n) {
 // Writes the world's entry and state. The length of an RLE run list is not known ahead, so each packed array is preceded by its size.
 inline bool saveWorld(const World& w, SaveWrite write, void* user) {
   using namespace savedetail;
-  Out o{write, user};
+  Out o(write, user);
   uint32_t m = SAVE_MAGIC;
   o.put(&m, 4);
   o.put(&w.entry, sizeof w.entry);
@@ -87,13 +87,13 @@ inline bool saveEntry(savedetail::In& in, EntryState& e) {
   in.get(&e, sizeof e);
   return in.ok && m == SAVE_MAGIC && e.magic == ENTRY_MAGIC;
 }
-inline bool saveReadEntry(SaveRead read, void* user, EntryState& e) { savedetail::In in{read, user}; return saveEntry(in, e); }
+inline bool saveReadEntry(SaveRead read, void* user, EntryState& e) { savedetail::In in(read, user); return saveEntry(in, e); }
 
 // Puts the saved state over a world that has just entered the saved level (World::restore(entry)). The source is read from its start.
 // False when the file is short or its packed arrays do not add up; the world is then not to be played.
 inline bool loadWorld(World& w, SaveRead read, void* user) {
   using namespace savedetail;
-  In in{read, user};
+  In in(read, user);
   EntryState e;
   if (!saveEntry(in, e)) return false;
   int32_t i32[34];
