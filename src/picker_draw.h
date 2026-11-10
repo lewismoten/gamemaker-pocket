@@ -86,12 +86,14 @@ template <class G> void drawKeyboard(G& tft, int W, int H, int titleH, const cha
 namespace pk {
 struct Tile { int x,y,w,h,pw,ph; };
 inline Tile tile(int W,int i) { bool s=W==320;return {(s?12:16)+i%3*(s?100:152),(s?36:40)+i/3*(s?84:120),s?96:144,s?80:112,s?96:144,s?60:90}; }
-inline int footer(int W) {return W==320?208:280;}
+inline int footer(int W) {return W==320?202:276;}  // the page buttons are 38 px (320) or 44 px (480) tall
 inline int hitTile(int W,int x,int y) {for(int i=0;i<6;i++){auto r=tile(W,i);if(x>=r.x&&x<r.x+r.w&&y>=r.y&&y<r.y+r.h)return i;}return -1;}
 template<class G> void clippedText(G&g,const Tile&r,const char*s,int x,int y,int scale,uint16_t color) {
   for(;*s;s++,x+=6*scale)for(int yy=0;yy<8;yy++)for(int xx=0;xx<6;xx++)if(((unsigned char)*s>=32&&(unsigned char)*s<=126&&(SOFT_FONT[(unsigned char)*s-32][yy]&(1<<xx))))
     for(int dy=0;dy<scale;dy++)for(int dx=0;dx<scale;dx++){int px=x+xx*scale+dx,py=y+yy*scale+dy;if(px>=r.x&&px<r.x+r.w&&py>=r.y&&py<r.y+r.h)g.fillRect(px,py,1,1,color);}
 }
+// The chosen tile: a 3 px yellow frame (not color alone: it is also the thickest line on the page).
+template<class G> void selFrame(G&g,const Tile&r) {g.drawRect(r.x+1,r.y+1,r.w-2,r.h-2,C_YELLOW);g.drawRect(r.x+2,r.y+2,r.w-4,r.h-4,C_YELLOW);}
 // A category icon (icons_data.h) at 2x, centered on cx, top at y; transparent pixels take the tile color. panelOrder swaps bytes for the panel.
 template<class G> void drawTileIcon(G&g,int icon,int cx,int y,bool panelOrder=false) {
   uint16_t row[32];
@@ -116,7 +118,7 @@ inline int labelLines(const Tile&r,const char*label,int scale,char lines[4][25])
 }
 // icon < 0: the name alone. The icon is dropped when the name needs its room.
 template<class G> void tileLabel(G&g,int W,int i,const char*label,bool selected=false,int icon=-1,bool panelOrder=false) {
-  auto r=tile(W,i);g.fillRect(r.x,r.y,r.w,r.h,C_DARK);g.drawRect(r.x,r.y,r.w,r.h,selected?C_YELLOW:C_GRAY);
+  auto r=tile(W,i);g.fillRect(r.x,r.y,r.w,r.h,C_DARK);g.drawRect(r.x,r.y,r.w,r.h,selected?C_YELLOW:C_GRAY);if(selected)selFrame(g,r);
   int scale=W==320?1:2;char lines[4][25];int count=labelLines(r,label,scale,lines);
   int text=count*10*scale,icons=icon>=0&&icon<ICON_COUNT&&text+36<=r.h-4?36:0;
   int y=r.y+(r.h-text-icons)/2;
@@ -173,7 +175,7 @@ template<class G> void thumbnail(G&g,int W,int i,const uint8_t*raw,const char*do
     g.pushImage(r.x,y0+y,r.pw,1,row);
   }if(caption)tileCaption(g,r,y0+shown+(r.w>=144?2:3),caption,course);
   }else tileName(g,r,dos,1);  // no title picture: the name main.cpp gives (the title, else the DOS name), wrapped; a picture is shown whole
-  g.drawRect(r.x,r.y,r.w,r.h,selected?C_YELLOW:C_GRAY);
+  g.drawRect(r.x,r.y,r.w,r.h,selected?C_YELLOW:C_GRAY);if(selected)selFrame(g,r);
   if(pinned)starMark(g,W,i);
   if(touch)touchMark(g,r.x+r.w-18,r.y+r.h-18,panelOrder);
   if(onBoard)boardMark(g,r);
@@ -231,21 +233,33 @@ constexpr uint32_t GEAR20[20] = {0x00F00,0x00F00,0x18F18,0x3CF3C,0x3FFFC,0x1FFF8
 template<class G> void drawBits20(G&g,int x0,int y0,const uint32_t*rows,uint16_t c=C_WHITE) {
   for(int y=0;y<20;y++)for(int x=0;x<20;){if(!(rows[y]>>(19-x)&1)){x++;continue;}int e=x;while(e<20&&(rows[y]>>(19-e)&1))e++;g.fillRect(x0+x,y0+y,e-x,1,c);x=e;}
 }
+// A small castle badge for the home page's title bar (the UI pack's mark, drawn in code: no art in flash). 26 x 26 at x, y.
+template<class G> void drawBadge(G&g,int x,int y) {
+  const uint16_t SKY=0x4D9F,STONE=0xC618,SHADE=0x8410,GOLD=0xFE60,DOOR=0x4A49;
+  g.fillRoundRect(x,y,26,26,5,SKY);g.drawRoundRect(x,y,26,26,5,C_WHITE);
+  g.fillRect(x+4,y+10,18,12,STONE);g.fillRect(x+3,y+6,6,16,STONE);g.fillRect(x+17,y+6,6,16,STONE);
+  for(int k=0;k<3;k++){g.fillRect(x+3+k*2+(k?0:0),y+4,2,3,STONE);g.fillRect(x+17+k*2,y+4,2,3,STONE);}
+  g.fillRect(x+11,y+15,4,7,DOOR);g.fillRect(x+4,y+22,18,2,SHADE);g.fillRect(x+12,y+7,2,5,GOLD);g.fillRect(x+12,y+7,5,2,GOLD);
+}
+// Touch zones of the title bar and the footer, shared with main.cpp (the hit tests) so the drawing and the taps agree.
+inline bool hitBack(int,int x) {return x<40;}
+inline bool hitSearch(int W,int x) {return x>=W-80&&x<W-40;}
+inline bool hitSettings(int W,int x) {return x>=W-40;}
+inline int pageArrow(int W,int x) {return x<56?-1:(x>=58&&x<114)?1:0;}  // -1 back, 1 next, 0 neither
+inline bool hitAction(int W,int x) {return x>=W-100;}
 template<class G> void libraryFrame(G&g,int W,int H,const char*breadcrumb,int page,int pages,const char*action,bool back=true,bool picked=true) {
   // back=false on the root page (nothing above it); action=nullptr leaves the right-hand footer button off; the page arrows
-  // go gray where there is no such page; picked=false (a game list, no game chosen yet) grays Details and says how to choose.
-  g.fillRect(0,0,W,32,C_DARK);if(back)drawButton(g,0,0,32,32,"<");
-  int bx=back?36:8;Tile clip={bx,0,W-68-bx,32,0,0};clippedText(g,clip,breadcrumb,bx,12,1,C_WHITE);
-  drawButton(g,W-64,0,W-32,32,"");drawButton(g,W-32,0,W,32,"");
-  drawBits20(g,W-58,6,MAGNIFIER20);drawBits20(g,W-26,6,GEAR20);
-  int f=footer(W);g.fillRect(0,f,W,H-f,C_BLACK);drawButton(g,0,f,48,H,"<",page>0);drawButton(g,50,f,98,H,">",page+1<pages);
+  // go gray where there is no such page; picked=false (a game list, no game chosen yet) grays Details.
+  // Buttons are 40 px wide or more (32 tall in the bar, whose tap zone runs to the tiles); the title is doubled when it fits.
+  g.fillRect(0,0,W,32,C_DARK);if(back)drawButton(g,0,0,40,32,"<");else drawBadge(g,6,3);
+  int bx=back?46:38,room=W-88-bx,k=(int)strlen(breadcrumb)*12<=room?2:1;Tile clip={bx,0,room,32,0,0};
+  clippedText(g,clip,breadcrumb,bx,16-4*k,k,C_WHITE);
+  drawButton(g,W-80,0,W-40,32,"");drawButton(g,W-40,0,W,32,"");
+  drawBits20(g,W-70,6,MAGNIFIER20);drawBits20(g,W-30,6,GEAR20);
+  int f=footer(W);g.fillRect(0,f,W,H-f,C_BLACK);drawButton(g,0,f,56,H,"<",page>0);drawButton(g,58,f,114,H,">",page+1<pages);
   char count[24];snprintf(count,sizeof count,"%d/%d",page+1,pages?pages:1);
-  Tile c={102,f,W-204,H-f,0,0};clippedText(g,c,count,108,f+(H-f-8)/2,1,C_WHITE);
-  bool details=action&&!strcmp(action,"Details");
-  if(details){  // one tap opens a game's Details, where Play starts it
-    const char*hint="Tap a game";(void)picked;
-    g.setTextSize(1);g.setTextColor(C_YELLOW,C_BLACK);g.setCursor(144,f+(H-f-8)/2);g.print(hint);
-  }
+  Tile c={116,f,W-216,H-f,0,0};clippedText(g,c,count,122,f+(H-f-16)/2,2,C_WHITE);
+  bool details=action&&!strcmp(action,"Details");(void)picked;
   if(action)drawButton(g,W-100,f,W,H,action,!details||picked);
 }
 } // namespace pk

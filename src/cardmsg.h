@@ -31,18 +31,19 @@ inline void cardChipText(CardState s, int count, char* out, size_t cap) {
     default: out[0] = 0;
   }
 }
-// In the title bar of the home page, between the name and the Search button. Problems are yellow.
+// In the footer of the home page, to the right of the page arrows (the pack's SD READY). Problems are yellow.
 template <class G> void drawCardChip(G& g, int W, CardState s, int count) {
   char t[32];
   cardChipText(s, count, t, sizeof t);
   if (!t[0]) return;
-  int sc = W == 320 ? 1 : 2, x0 = W == 320 ? 94 : 110, x1 = W - 68, w = (int)strlen(t) * 6 * sc;
-  if (x0 + w + 8 > x1) return;  // never over the buttons
+  int sc = W == 320 ? 1 : 2, f = footer(W), h = (W == 320 ? 240 : 320) - f - 6, w = (int)strlen(t) * 6 * sc;
+  int x1 = W - 4, x0 = x1 - w - 12;
+  if (x0 < 120) return;  // never over the page arrows
   bool bad = s == CARD_NONE || s == CARD_UNREADABLE || s == CARD_NOFOLDER;
-  g.fillRoundRect(x0, 4, w + 8, 24, 6, C_BLACK);
-  g.drawRoundRect(x0, 4, w + 8, 24, 6, bad ? C_YELLOW : C_GRAY);
-  Tile clip = {x0, 4, w + 8, 24, 0, 0};
-  clippedText(g, clip, t, x0 + 4, 16 - 4 * sc, sc, bad ? C_YELLOW : C_WHITE);
+  g.fillRoundRect(x0, f + 3, w + 12, h, 6, C_BLACK);
+  g.drawRoundRect(x0, f + 3, w + 12, h, 6, bad ? C_YELLOW : C_GRAY);
+  Tile clip = {x0, f + 3, w + 12, h, 0, 0};
+  clippedText(g, clip, t, x0 + 6, f + 3 + (h - 8 * sc) / 2, sc, bad ? C_YELLOW : C_WHITE);
 }
 // Words wrapped to `cols` characters, at most `max` lines of 40.
 inline int wrapText(const char* s, int cols, char (*lines)[41], int max) {

@@ -1003,7 +1003,7 @@ static int page = 0, selected = -1, nmatch = 0;
 static char searchText[25] = "", savedSearch[25] = "";
 static bool searchAll = true, savedAll = true, browsingCategories = true, savedBrowsing = true;
 static int category = 0, subcategory = -1;
-constexpr int PK_BTN_Y = scr::SMALL ? 208 : 280;
+constexpr int PK_BTN_Y = scr::SMALL ? 202 : 276;  // = pk::footer
 static int categorySlots[32], categoryCount = 0;
 static const char* rootLabel(int c) {const char*names[]={"All games","Starters","Sandbox","Bizarre","My games","Imported","CD","Good on touch","Continue","Recently played","Favorites"};return names[c];}
 // ---- Continue: the last level entered, kept in NVS (pocket/resume) ----------------------------------------------
@@ -2408,7 +2408,7 @@ static bool menuTap(prs::Screen sc, int& tx, int& ty) {
   uint32_t now = millis();
   prs::Ev e = press.update(now, pts.n > 0, pts.n ? pts.x[0] : 0, pts.n ? pts.y[0] : 0, [&](int x, int y, prs::Rect& r) { return prs::under(c, x, y, r); });
   if (e == prs::PRESS) {
-    if (sc == prs::SC_PICKER && press.dy >= PK_BTN_Y && press.dx < 98) press.makeRepeatable();  // the page arrows
+    if (sc == prs::SC_PICKER && press.dy >= PK_BTN_Y && press.dx < 114) press.makeRepeatable();  // the page arrows
     if (sc == prs::SC_PAUSE) prs::drawPausePressed(tft, ovl::pauseHit(press.dx, press.dy), pauseArm.armed);
     else prs::drawPressed(tft, press.r);
   }
@@ -2534,18 +2534,18 @@ void loop() {
 #endif
     if (menuTap(prs::SC_PICKER, tx, ty)) {
       int count=browsingCategories?categoryCount:nmatch,pages=(count+5)/6;
-      if(ty<32) {
-        if(tx>=scr::W-32){stopCardScan();openSettings(false);}
-        else if(tx>=scr::W-64){stopCardScan();strcpy(savedSearch,searchText);savedAll=searchAll;savedBrowsing=browsingCategories;mode=SEARCH_SCREEN;drawSearch();}
-        else if(tx<32&&!(browsingCategories&&!category&&!searchText[0])){  // the root page has no back arrow
+      if(ty<36) {
+        if(pk::hitSettings(scr::W,tx)){stopCardScan();openSettings(false);}
+        else if(pk::hitSearch(scr::W,tx)){stopCardScan();strcpy(savedSearch,searchText);savedAll=searchAll;savedBrowsing=browsingCategories;mode=SEARCH_SCREEN;drawSearch();}
+        else if(pk::hitBack(scr::W,tx)&&!(browsingCategories&&!category&&!searchText[0])){  // the root page has no back arrow
           if(searchText[0])searchText[0]=0;
           else if(!browsingCategories&&(category==1||category==5||category==6)){browsingCategories=true;subcategory=-1;}
           else {browsingCategories=true;category=0;subcategory=-1;}page=0;selected=-1;drawPicker();
         }
       }else if(ty>=PK_BTN_Y) {
-        if(tx<48&&page>0){page--;restoreSelection=false;selected=-1;drawPicker(false,true);}
-        else if(tx>=50&&tx<98&&page+1<pages){page++;restoreSelection=false;selected=-1;drawPicker(false,true);}
-        else if(tx>=scr::W-100){
+        if(pk::pageArrow(scr::W,tx)<0&&page>0){page--;restoreSelection=false;selected=-1;drawPicker(false,true);}
+        else if(pk::pageArrow(scr::W,tx)>0&&page+1<pages){page++;restoreSelection=false;selected=-1;drawPicker(false,true);}
+        else if(pk::hitAction(scr::W,tx)){
           if(searchText[0]&&!nmatch){searchText[0]=0;drawPicker();}
           else if(selected>=0&&selected<ngames)openDetails();
         }
