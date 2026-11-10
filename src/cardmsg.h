@@ -163,5 +163,6 @@ template <class G> void drawFailCard(G& g, int W, int H, const char* name, LoadF
   Tile b = failButton(W, H);
   drawButton(g, b.x, b.y, b.x + b.w, b.y + b.h, "Back to games");
 }
-inline bool inFailButton(int W, int H, int x, int y) { Tile b = failButton(W, H); return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h; }
+inline bool inFailButton(int W, int H, int x, int y) { // No neighboring action: add four pixels above and below the drawn button.
+  Tile b = failButton(W, H); return x >= b.x && x < b.x + b.w && y >= b.y - 4 && y < b.y + b.h + 4; }
 } // namespace pk

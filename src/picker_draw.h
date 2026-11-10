@@ -67,6 +67,14 @@ template <class G> void drawSearchText(G& tft, int titleH, const char* text, con
   tft.setCursor(8 + prefix * 12, titleH + 4); tft.print(shown + prefix);
   tft.fillRect(8 + strlen(shown) * 12, titleH + 4, 2, 16, C_WHITE);
 }
+// The search header has four pixels of safe slop below its 32 px drawing.
+constexpr int SEARCH_HEADER_HIT_H = 36;
+// Keep the footer's visible four-pixel gutters inert, including during Backspace repeat.
+inline int keyboardAction(int W, int x) {
+  if (x < 0 || x >= W) return -1;
+  int k = x * 4 / W;
+  return x >= k * W / 4 + 2 && x < (k + 1) * W / 4 - 2 ? k : -1;
+}
 template <class G> void drawKeyboard(G& tft, int W, int H, int titleH, const char* text) {
   tft.fillRect(0,0,W,H,C_BLACK);
   drawSearchText(tft, titleH, text);
@@ -190,11 +198,11 @@ template<class G> void thumbnail(G&g,int W,int i,const uint8_t*raw,const char*do
 // Details' footer: Back, the Favorite star (a toggle: outlined, or filled when the game is a favorite) and Play, in thirds.
 inline int detailsButton(int W,int x) {return x<W/3?0:x<2*W/3?1:2;}
 template<class G> void detailsFooter(G&g,int W,int H,bool pinned) {
-  int y0=detailsFooterTop(H);drawButton(g,0,y0,W/3-2,H,"Back");g.fillRoundRect(2*W/3,y0,W-2*W/3,H-y0,6,C_YELLOW);
-  Tile play={2*W/3,y0,W-2*W/3,H-y0,0,0};clippedText(g,play,"Play",(2*W/3+W)/2-24,y0+14,2,C_BLACK);drawButton(g,W/3,y0,2*W/3-2,H,"");
-  bool s=W==320;int scale=s?1:2,R=s?9:11,tw=8*6*scale,x=W/3+(W/3-2-(2*R+6+tw))/2,cy=(y0+H)/2;
+  int y0=detailsFooterTop(H);drawButton(g,0,y0,W/3-4,H,"Back");g.fillRoundRect(2*W/3,y0,W-2*W/3,H-y0,6,C_YELLOW);
+  Tile play={2*W/3,y0,W-2*W/3,H-y0,0,0};clippedText(g,play,"Play",(2*W/3+W)/2-24,y0+14,2,C_BLACK);drawButton(g,W/3,y0,2*W/3-4,H,"");
+  bool s=W==320;int scale=s?1:2,R=s?9:11,tw=8*6*scale,x=W/3+(W/3-4-(2*R+6+tw))/2,cy=(y0+H)/2;
   drawStar(g,x+R,cy,R,C_YELLOW,!pinned,C_DARK);
-  Tile clip={W/3,y0,W/3-2,H-y0,0,0};clippedText(g,clip,"Favorite",x+2*R+6,cy-4*scale,scale,pinned?C_YELLOW:C_WHITE);
+  Tile clip={W/3,y0,W/3-4,H-y0,0,0};clippedText(g,clip,"Favorite",x+2*R+6,cy-4*scale,scale,pinned?C_YELLOW:C_WHITE);
 }
 // An empty Favorites page: how to star a game, or (hidden) that the starred games are on a card that is not in.
 template<class G> void emptyFavorites(G&g,int W,bool hidden) {
@@ -251,20 +259,20 @@ template<class G> void drawBadge(G&g,int x,int y) {
 }
 // Touch zones of the title bar and the footer, shared with main.cpp (the hit tests) so the drawing and the taps agree.
 inline bool hitBack(int,int x) {return x<40;}
-inline bool hitSearch(int W,int x) {return x>=W-80&&x<W-40;}
+inline bool hitSearch(int W,int x) {return x>=W-84&&x<W-44;}
 inline bool hitSettings(int W,int x) {return x>=W-40;}
-inline int pageArrow(int,int x) {return x<56?-1:(x>=58&&x<114)?1:0;}  // -1 back, 1 next, 0 neither
+inline int pageArrow(int,int x) {return x<54?-1:(x>=58&&x<114)?1:0;}  // -1 back, 1 next, 0 neither
 inline bool hitAction(int W,int x) {return x>=W-100;}
 template<class G> void libraryFrame(G&g,int W,int H,const char*breadcrumb,int page,int pages,const char*action,bool back=true,bool picked=true) {
   // back=false on the root page (nothing above it); action=nullptr leaves the right-hand footer button off; the page arrows
   // go gray where there is no such page; picked=false (a game list, no game chosen yet) grays Details.
   // Header targets are 40 px wide and 40/44 px tall; the title is doubled when it fits.
   int bh=header(W);g.fillRect(0,0,W,bh,C_DARK);if(back)drawButton(g,0,0,40,bh,"<");else drawBadge(g,6,(bh-26)/2);
-  int bx=back?46:38,room=W-88-bx,k=(int)strlen(breadcrumb)*12<=room?2:1;Tile clip={bx,0,room,bh,0,0};
+  int bx=back?46:38,room=W-92-bx,k=(int)strlen(breadcrumb)*12<=room?2:1;Tile clip={bx,0,room,bh,0,0};
   clippedText(g,clip,breadcrumb,bx,bh/2-4*k,k,C_WHITE);
-  drawButton(g,W-80,0,W-40,bh,"");drawButton(g,W-40,0,W,bh,"");
-  drawBits20(g,W-70,(bh-20)/2,MAGNIFIER20);drawBits20(g,W-30,(bh-20)/2,GEAR20);
-  int f=footer(W);g.fillRect(0,f,W,H-f,C_BLACK);drawButton(g,0,f,56,H,"<",page>0);drawButton(g,58,f,114,H,">",page+1<pages);
+  drawButton(g,W-84,0,W-44,bh,"");drawButton(g,W-40,0,W,bh,"");
+  drawBits20(g,W-74,(bh-20)/2,MAGNIFIER20);drawBits20(g,W-30,(bh-20)/2,GEAR20);
+  int f=footer(W);g.fillRect(0,f,W,H-f,C_BLACK);drawButton(g,0,f,54,H,"<",page>0);drawButton(g,58,f,114,H,">",page+1<pages);
   char count[24];snprintf(count,sizeof count,"%d/%d",page+1,pages?pages:1);
   Tile c={116,f,W-216,H-f,0,0};clippedText(g,c,count,122,f+(H-f-16)/2,2,C_WHITE);
   Tile section={12,bh,W-24,14,0,0};clippedText(g,section,action?"GAMES":"COLLECTIONS",12,bh+2,1,C_GRAY);

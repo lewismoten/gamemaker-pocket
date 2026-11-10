@@ -77,8 +77,8 @@ constexpr int BAR_H = scr::SMALL ? 38 : 44, ROW_H = scr::SMALL ? 36 : 48, GAP = 
 inline Box backBox() { return {2, 0, 2 + (scr::SMALL ? 40 : 56), BAR_H - 2}; }
 inline int rowY(int r) { return scr::H - 2 * (ROW_H + GAP) + r * (ROW_H + GAP); }  // 0 Gamma, 1 Tuning
 inline Box chipBox(int r, int k) {
-  int x0 = scr::W * 30 / 100, w = (scr::W - 4 - x0 - 3 * 3) / 4;
-  return {x0 + k * (w + 3), rowY(r), x0 + k * (w + 3) + w, rowY(r) + ROW_H};
+  int x0 = scr::W * 30 / 100, w = (scr::W - 4 - x0 - 3 * GAP) / 4;
+  return {x0 + k * (w + GAP), rowY(r), x0 + k * (w + GAP) + w, rowY(r) + ROW_H};
 }
 inline Box cardBox() { return {4, BAR_H + 4, scr::W - 4, rowY(0) - 6}; }
 enum Kind : uint8_t { K_NONE, K_BACK, K_GAMMA, K_TUNE };

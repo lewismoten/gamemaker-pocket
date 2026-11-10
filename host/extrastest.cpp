@@ -38,12 +38,35 @@ int main(int argc,char** argv) {
     assert(prs::under(c,x,y,r)==live);
     if(live)assert(r.y0==pk::footer(g.W)&&r.y1-r.y0>=36);
   }
+  // Acquisition gutters must be inert: a finger landing between different actions
+  // cannot choose one merely because the drawing left a gap.
+  for(int x=g.W-44;x<g.W-40;x++) {
+    prs::Rect r;assert(!prs::under(c,x,10,r));
+  }
+  for(int x=54;x<58;x++) {
+    prs::Rect r;assert(!prs::under(c,x,g.H-10,r));
+  }
+  for(int k=0;k<4;k++)for(int x=k*g.W/4;x<(k+1)*g.W/4;x++) {
+    int action=pk::keyboardAction(g.W,x);
+    assert(action==(x>=k*g.W/4+2&&x<(k+1)*g.W/4-2?k:-1));
+  }
+  assert(pk::keyboardAction(g.W,-1)==-1&&pk::keyboardAction(g.W,g.W)==-1);
+  assert(pk::SEARCH_HEADER_HIT_H>=36&&pk::SEARCH_HEADER_HIT_H<=58);
+  // The isolated failure action gains slop without changing its drawing.
+  auto fail=pk::failButton(g.W,g.H);
+  assert(pk::inFailButton(g.W,g.H,fail.x,fail.y-4));
+  assert(pk::inFailButton(g.W,g.H,fail.x,fail.y+fail.h+3));
+  assert(!pk::inFailButton(g.W,g.H,fail.x,fail.y-5));
+  assert(!pk::inFailButton(g.W,g.H,fail.x,fail.y+fail.h+4));
   c.emptyCheck=true;c.tiles=0;
   auto eb=pk::emptyButton(g.W);
   for(int y=pk::header(g.W);y<pk::footer(g.W);y++)for(int x=0;x<g.W;x++){
     prs::Rect r;assert(prs::under(c,x,y,r)==pk::inEmptyButton(g.W,x,y));
   }
   c.emptyCheck=false;c.screen=prs::SC_DETAILS;
+  for(int boundary : {g.W/3,2*g.W/3})for(int x=boundary-4;x<boundary;x++) {
+    prs::Rect r;assert(!prs::under(c,x,g.H-10,r));
+  }
   for(int mask=0;mask<8;mask++){
     c.pages=mask;
     for(int k=0,x0,x1;k<3;k++)if(pk::detailsPageSpan(g.W,mask,k,x0,x1)){

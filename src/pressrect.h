@@ -36,11 +36,11 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
       int f = pk::footer(W);
       if (y < pk::header(W)) {
         if (x >= W - 40) r = {W - 40, 0, W, pk::header(W)};
-        else if (x >= W - 80) r = {W - 80, 0, W - 40, pk::header(W)};
+        else if (x >= W - 84 && x < W - 44) r = {W - 84, 0, W - 44, pk::header(W)};
         else if (x < 40 && c.back) r = {0, 0, 40, pk::header(W)};
         else return false;
       } else if (y >= f) {
-        if (x < 56 && c.prev) r = {0, f, 56, H};
+        if (x < 54 && c.prev) r = {0, f, 54, H};
         else if (x >= 58 && x < 114 && c.next) r = {58, f, 114, H};
         else if (x >= W - 100 && c.action) r = {W - 100, f, W, H};
         else return false;
@@ -62,7 +62,7 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
       }
     }
       if (y < pk::detailsFooterTop(H)) return false;
-      r = x < W / 3 ? Rect{0, pk::detailsFooterTop(H), W / 3 - 2, H} : x < 2 * W / 3 ? Rect{W / 3, pk::detailsFooterTop(H), 2 * W / 3 - 2, H} : Rect{2 * W / 3, pk::detailsFooterTop(H), W, H};
+      r = x < W / 3 ? Rect{0, pk::detailsFooterTop(H), W / 3 - 4, H} : x < 2 * W / 3 ? Rect{W / 3, pk::detailsFooterTop(H), 2 * W / 3 - 4, H} : Rect{2 * W / 3, pk::detailsFooterTop(H), W, H};
       return r.has(x, y);
     case SC_DISPLAY:
       if (y >= H - 38) r = {6, H - 38, 100, H - 2};

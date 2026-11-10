@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
   for (size_t i = 0; i < bar.size(); i++) {
     const st::Box& b = bar[i];
     if (b.x1 - b.x0 < 36 || b.y1 - b.y0 < 36 || b.x0 < 0 || b.x1 > scr::W || b.y1 > st::G.barH) fail("bar button small or off screen");
-    for (size_t j = i + 1; j < bar.size(); j++) if (overlap(b, bar[j])) fail("bar buttons overlap");
+    for (size_t j = i + 1; j < bar.size(); j++) if (overlap(b, bar[j]) || (j == i + 1 && bar[j].x0 - b.x1 < 4)) fail("bar buttons need a four-pixel gap");
   }
   for (int t = 0; t < st::T_COUNT; t++) {
     st::Item all[12];
@@ -127,6 +127,7 @@ int main(int argc, char** argv) {
           int c = st::chipCount(it[i]);
           for (int j = 0; j < c; j++) {
             st::Box b = st::chipBox(rb.chips, c, j);
+            if (j && b.x0 - st::chipBox(rb.chips, c, j-1).x1 < 4) fail("chips need a four-pixel gap");
             char lab[24];
             st::chipLabel(it[i], j, lab, sizeof lab);
             std::string nm = std::string(st::info(it[i]).name) + " / " + lab;
@@ -138,6 +139,11 @@ int main(int argc, char** argv) {
             if (prs::under(ctx, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, r) != live) fail("hit table misses " + nm);
             st::Hit h = st::hit(v, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2);
             if (live && (h.kind != st::K_CHIP || h.item != it[i] || h.chip != j)) fail("hit finds the wrong chip for " + nm);
+            if (c == 1) {
+              st::Hit label = st::hit(v, 6, (b.y0+b.y1)/2);
+              if (live ? (label.kind != st::K_CHIP || label.item != it[i] || label.box.x0 != 4) : label.kind != st::K_NONE)
+                fail("single-action row label / paused Rescan hit mismatch");
+            }
             for (auto& o : boxes) if (overlap(o, b)) fail("chip overlaps another button: " + nm);
             boxes.push_back(b);
             buttons++;
@@ -234,6 +240,7 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < all.size(); i++) {
       const pt::Box& b = all[i];
       buttons++;
+      if (i && (i-1)%4 && b.x0-all[i-1].x1<4) fail("picture: chips need a four-pixel gap");
       if (b.x1 - b.x0 < 36 || b.y1 - b.y0 < 36) fail("picture: a button under 36 x 36");
       if (b.x0 < 0 || b.y0 < 0 || b.x1 > scr::W || b.y1 > scr::H) fail("picture: a button off screen");
       for (size_t j = 0; j < i; j++) if (all[j].x0 < b.x1 && b.x0 < all[j].x1 && all[j].y0 < b.y1 && b.y0 < all[j].y1) fail("picture: buttons overlap");

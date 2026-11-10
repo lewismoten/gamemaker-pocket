@@ -206,8 +206,8 @@ inline Box backBox() { return {2, (G.barH - G.tabH) / 2, 2 + G.backW, (G.barH - 
 inline Box tabBox(int t) {
   int base[T_COUNT], sum = 0;
   for (int i = 0; i < T_COUNT; i++) { base[i] = (int)(strlen(tabName(i)) * 6 * G.tabSize) + 10; sum += base[i]; }
-  int x = backBox().x1 + 4, room = W - 2 - x - 3 * 2, extra = (room - sum) / T_COUNT;
-  for (int i = 0; i < t; i++) x += base[i] + extra + 2;
+  int x = backBox().x1 + 4, room = W - 2 - x - 3 * 4, extra = (room - sum) / T_COUNT;
+  for (int i = 0; i < t; i++) x += base[i] + extra + 4;
   return {x, backBox().y0, x + base[t] + extra, backBox().y1};
 }
 // A row's name line and its chip strip.
@@ -222,7 +222,7 @@ inline RowBox rowBox(Tab t, int k) {
   return {6, y + (G.lineChipH - (int)(8 * G.nameSize)) / 2, {W * 36 / 100, y, W - 4, y + G.lineChipH}};
 }
 inline Box chipBox(const Box& strip, int n, int k) {
-  const int gap = 3;
+  const int gap = 4;
   int w = (strip.x1 - strip.x0 - gap * (n - 1)) / n;
   return {strip.x0 + k * (w + gap), strip.y0, strip.x0 + k * (w + gap) + w, strip.y1};
 }
@@ -254,7 +254,9 @@ inline Hit hit(const View& v, int x, int y) {
     RowBox r = rowBox(v.tab, k);
     int c = chipCount(it[k]);
     for (int j = 0; j < c; j++) {
+      // Single actions can also be reached through their noninteractive row label.
       Box b = chipBox(r.chips, c, j);
+      if (c == 1) b.x0 = 4;
       if (b.has(x, y)) { h.kind = K_CHIP; h.item = it[k]; h.chip = j; h.box = b; return h; }
     }
   }

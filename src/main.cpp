@@ -1120,7 +1120,7 @@ static void drawPicker(bool clear = true, bool paging = false) {
 static void drawSearch() {
   tft.fillScreen(C_BLACK);pk::drawKeyboard(tft,scr::W,scr::H,32,searchText);
   pk::drawButton(tft,0,0,40,32,"<");
-  pk::drawButton(tft,42,0,scr::W,32,searchAll?"All games":"This category");
+  pk::drawButton(tft,44,0,scr::W,32,searchAll?"All games":"This category");
   pk::drawSmallIcon(tft,searchAll?0:18,50,8,true);
 }
 static int detailsMask = 0;  // the selected game's own pages (picker.h detailsPageSpan), read from its .cfg when Details opens
@@ -2573,13 +2573,13 @@ void loop() {
     if (freshTap(tx, ty)) {
       char previous[sizeof searchText];memcpy(previous,searchText,sizeof previous);
       int n=strlen(searchText),top=58,step=(scr::H-top-38)/4;
-      if(ty<32){if(tx<40){strcpy(searchText,savedSearch);searchAll=savedAll;browsingCategories=savedBrowsing;mode=PICKER;drawPicker();return;}searchAll=!searchAll;drawSearch();}
-      else if(ty>=scr::H-36){int b=tx*4/scr::W;if(b==0&&n<24){searchText[n]=' ';searchText[n+1]=0;}if(b==1&&n){searchText[n-1]=0;bkOn=true;bkNext=now+prs::REPEAT_DELAY_MS;}if(b==2)searchText[0]=0;if(b==3){page=0;selected=-1;browsingCategories=false;mode=PICKER;drawPicker();return;}}
+      if(ty<pk::SEARCH_HEADER_HIT_H){if(tx<40){strcpy(searchText,savedSearch);searchAll=savedAll;browsingCategories=savedBrowsing;mode=PICKER;drawPicker();return;}if(tx>=44){searchAll=!searchAll;drawSearch();}}
+      else if(ty>=scr::H-36){int b=pk::keyboardAction(scr::W,tx);if(b==0&&n<24){searchText[n]=' ';searchText[n+1]=0;}if(b==1&&n){searchText[n-1]=0;bkOn=true;bkNext=now+prs::REPEAT_DELAY_MS;}if(b==2)searchText[0]=0;if(b==3){page=0;selected=-1;browsingCategories=false;mode=PICKER;drawPicker();return;}}
       else if(ty>=top&&ty<top+4*step&&n<24){searchText[n]="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[(ty-top)/step*9+tx*9/scr::W];searchText[n+1]=0;}
       pk::drawSearchText(tft,32,searchText,previous);
     }else if(bkOn){  // Backspace held: it repeats (400 ms, then 8 a second) while the finger stays on it
       int n=strlen(searchText);
-      if(pts.n==0||pts.y[0]<scr::H-36||pts.x[0]*4/scr::W!=1)bkOn=false;
+      if(pts.n==0||pts.y[0]<scr::H-36||pk::keyboardAction(scr::W,pts.x[0])!=1)bkOn=false;
       else if(now>=bkNext&&n){char previous[sizeof searchText];memcpy(previous,searchText,sizeof previous);searchText[n-1]=0;
         bkNext=now-bkNext>prs::REPEAT_EVERY_MS?now+prs::REPEAT_EVERY_MS:bkNext+prs::REPEAT_EVERY_MS;pk::drawSearchText(tft,32,searchText,previous);}
     }delay(5);return;
