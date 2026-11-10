@@ -36,6 +36,8 @@ Use a USB cable that carries data. If `pio` is not on your PATH it is at `~/.pla
 
 Games can also live in the board's own flash: every `NAME.GMP` in LittleFS `/games` is listed beside the card's (tag: On board; if a game is on both, the card's copy wins). The web flasher's "Player + starter games" image is built by `scripts/build-pages.sh` from five exported games (`GAMEMAKER_DIR`, default `../GameMaker`).
 
+**Send games over USB:** the install page's Send games tab (`docs/send.js`, `docs/pocketdisk.js`) talks to the firmware over Web Serial (Chrome or Edge). With the board on its game list it shows the games and free space, sends `.GMP` files (up to 2 MB each, every chunk with a CRC-32, written to a temporary file and renamed, so a cable pulled half way leaves the old game as it was), removes games and sets their order (up to 256). A replacement is checked as if the old copy stays, because both exist until the transfer ends. The serial `DISK ...` commands and their rules are in `src/serialfs.h`; the page's code is tested with `node host/pocketdisktest.mjs`.
+
 The 106 Starters in `data/` go into LittleFS with `uploadfs`. More games go on a FAT32 microSD card, in a `/pocket` folder, one `.GMP` file each. Game packs and the library index are made by Game-Maker: Sandbox Edition, not by this repository:
 
 - `data/` (`games.txt`, `cards.pak`, `small.pak`, `thumbs.pak`, `library.jsonl`, `font.bin`) is the output of `cd web && npx vite-node scripts/pocketData.ts --out <dir>` in a Game-Maker: Sandbox Edition checkout (`web/scripts/pocketData.ts`, with `pocketArt.ts` for the icons and splash).

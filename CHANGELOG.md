@@ -7,7 +7,14 @@ The firmware has no release number of its own. Every build bakes in its git hash
 ### Added
 
 - Games can be kept in the board's flash (LittleFS `/games`) and play like card games, marked On board; a card copy wins over a board copy.
+- The web flasher's Send games tab and the serial `DISK` commands: list, send, remove and reorder the games in the board's flash over USB (`src/serialfs.h`, `docs/send.js`, `docs/pocketdisk.js`).
 - The web flasher's "Player + starter games" install (Virus Blaster, Snowbound, KEEP IT BRIEF!, Sandcastle Knight, Where's the Remote?!), now its default.
+
+### Fixed
+
+- Send games: the port closes cleanly (a retry after Disconnect, a busy board or a timeout needs no page reload); the space check no longer counts the file a send replaces; bytes that are not a game are refused (`DISK ERR notgmp`); input after an aborted transfer is discarded; the order list takes up to 256 games.
+- A level's block counts from a `.cfg` are clamped to what the engine can index, and the block file's size is checked in 64 bits (a hostile count could wrap on the 32-bit board and read past a buffer).
+- `host/README.md` commands use this repository's paths.
 
 ## 0.1.0 - 2026-11-09
 

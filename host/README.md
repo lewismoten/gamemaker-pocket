@@ -9,15 +9,15 @@ Use a C++17 compiler and zlib development headers, plus Python 3. Run from the r
 ```sh
 mkdir -p "$TMPDIR/pocket-faults"
 c++ -std=c++17 -O1 -g -Wall -Wextra -fsanitize=address,undefined \
-  -fno-omit-frame-pointer -Ihardware/pocket-player/src \
-  hardware/pocket-player/host/sdfaulttest.cpp -lz -o "$TMPDIR/pocket-faults/sdfaulttest"
-timeout 30 "$TMPDIR/pocket-faults/sdfaulttest" hardware/pocket-player/data first-steps
-timeout 30 "$TMPDIR/pocket-faults/sdfaulttest" hardware/pocket-player/data take-the-wheel
-python3 hardware/pocket-player/host/transitiontest.py
-python3 hardware/pocket-player/host/boardcardtest.py
+  -fno-omit-frame-pointer -Isrc \
+  host/sdfaulttest.cpp -lz -o "$TMPDIR/pocket-faults/sdfaulttest"
+timeout 30 "$TMPDIR/pocket-faults/sdfaulttest" data first-steps
+timeout 30 "$TMPDIR/pocket-faults/sdfaulttest" data take-the-wheel
+python3 host/transitiontest.py
+python3 host/boardcardtest.py
 c++ -std=c++17 -O1 -g -Wall -Wextra -Wno-unused-function \
   -fsanitize=address,undefined -fno-omit-frame-pointer \
-  -Ihardware/pocket-player/src hardware/pocket-player/host/hostpaktest.cpp \
+  -Isrc host/hostpaktest.cpp \
   -o "$TMPDIR/pocket-faults/hostpaktest"
 "$TMPDIR/pocket-faults/hostpaktest" "$TMPDIR/pocket-faults"
 ```
@@ -63,10 +63,10 @@ sweep, FAT test, or proof of controller timeout behavior. Test those separately 
 ## Every-level software frame profiling
 
 ```sh
-python3 hardware/pocket-player/host/profiletest.py
+python3 host/profiletest.py
 # First generate microSD files with pocketData.ts --out CARD_ROOT (see ../README.md).
-python3 hardware/pocket-player/host/profile.py \
-  --data hardware/pocket-player/data --card CARD_ROOT/pocket \
+python3 host/profile.py \
+  --data data --card CARD_ROOT/pocket \
   --out "$TMPDIR/pocket-profile" --expected-games 121
 ```
 
@@ -106,3 +106,5 @@ conversion, board controls, audio task contention, SD latency, NVS, or board all
 these frame measurements. No board performance budget is defined by this tool. The loop's
 18.2 Hz scheduling cadence in `main.cpp` is not a host-frame or board-render budget; any
 comparison to that cadence must be labeled a host-only diagnostic, not a CYD pass/fail.
+
+The Send games page's code (`docs/pocketdisk.js`) has a Node test with a mock Web Serial port: `node host/pocketdisktest.mjs`. The serial file commands' parser is `host/serialfstest.cpp`, and the play core's count clamps are in `host/coretest.cpp`.
