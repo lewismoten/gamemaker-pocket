@@ -20,12 +20,15 @@ int main() {
   Cmd o = parse("DISK ORDER 5"); assert(o.kind == ORDER && o.count == 5);
   for (const char* bad : {"", "DISK", "DISKS LS", "DISK ", "DISK NOPE", "DISK LS now", "DISK PUT", "DISK PUT A.GMP", "DISK PUT A.GMP 0 00000000", "DISK PUT A.GMP 2097153 00000000", "DISK PUT A.GMP 99999999999 0",
                           "DISK PUT A.GMP 10 xyz", "DISK PUT A.GMP 10 123456789", "DISK PUT A.GMP 10 00 extra", "DISK PUT ORDER.TXT 10 00", "DISK PUT ../A.GMP 10 00", "DISK PUT a.gmp 10 00", "DISK C 0 00", "DISK C 1025 00", "DISK C 10",
-                          "DISK C -5 00", "DISK DEL ORDER.TXT", "DISK DEL /games/A.GMP", "DISK DEL A.GMP B.GMP", "DISK ORDER 65", "DISK ORDER x", "DISK ORDER", "DISK PUT VERYLONGNAMEXX.GMP 10 00"})
+                          "DISK C -5 00", "DISK DEL ORDER.TXT", "DISK DEL /games/A.GMP", "DISK DEL A.GMP B.GMP", "DISK ORDER 257", "DISK ORDER x", "DISK ORDER", "DISK PUT VERYLONGNAMEXX.GMP 10 00"})
     assert(parse(bad).kind == BAD);
   assert(roundUp(1) == 4096 && roundUp(4096) == 4096 && roundUp(4097) == 8192 && roundUp(0) == 0);
-  assert(fits(100000, 0, 3000000, 1000000) && !fits(100000, 0, 3000000, 2950000) && fits(100000, 0, 3000000, 2950000 + 0) == false);
-  assert(fits(200000, 200000, 1000000, 990000) && !fits(0, 0, 100, 0) && !fits(FILE_MAX + 1, 0, 100000000, 0));
-  assert(fits(4096, 0, 12288, 0) && !fits(4096, 0, 12287 - 4096, 0) && !fits(4096, 0, 8192, 0));
-  assert(!fits(10, 0, 100, 500));
+  assert(fits(100000, 3000000, 1000000) && !fits(100000, 3000000, 2950000));
+  assert(!fits(0, 100, 0) && !fits(FILE_MAX + 1, 100000000, 0));
+  assert(fits(4096, 12288, 0) && !fits(4096, 12287 - 4096, 0) && !fits(4096, 8192, 0));
+  assert(!fits(10, 100, 500));
+  // a replacement is checked as if the old copy stays: 100 KB free, a 120 KB file does not fit however big the one it replaces
+  assert(!fits(120000, 3000000, 3000000 - 100000));
+  assert(parse("DISK ORDER 256").kind == ORDER && parse("DISK ORDER 100").kind == ORDER);
   puts("serialfstest ok");
 }

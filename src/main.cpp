@@ -1853,6 +1853,15 @@ static bool diskLine(char* out, size_t cap, uint32_t waitMs) {  // one line from
   }
   return false;
 }
+// After a transfer is dropped the host may still be sending (a chunk's bytes, the rest of the names): read until the line is quiet
+// for 200 ms, so none of it is taken for commands.
+static void diskDrain() {
+  uint32_t t = millis();
+  while (millis() - t < 200) {
+    if (Serial.read() >= 0) { t = millis(); continue; }
+    delay(1);
+  }
+}
 static void diskList() {
   File dir = LittleFS.open("/games");
   if (dir && dir.isDirectory()) {
@@ -1884,9 +1893,7 @@ static void diskList() {
 static void diskPut(const pk::sfs::Cmd& c) {
   char path[32];
   snprintf(path, sizeof path, "/games/%s", c.name);
-  uint32_t replaced = 0;
-  if (File old = LittleFS.open(path, "r")) { replaced = old.size(); old.close(); }
-  if (!pk::sfs::fits(c.size, replaced, LittleFS.totalBytes(), LittleFS.usedBytes())) {
+  if (!pk::sfs::fits(c.size, LittleFS.totalBytes(), LittleFS.usedBytes())) {
     Serial.printf("DISK ERR space %lu\n", (unsigned long)(LittleFS.totalBytes() - LittleFS.usedBytes()));
     return;
   }
@@ -1902,7 +1909,7 @@ static void diskPut(const pk::sfs::Cmd& c) {
     if (!diskLine(line, sizeof line, 8000)) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR timeout"); return; }
     pk::sfs::Cmd k = pk::sfs::parse(line);
     if (k.kind == pk::sfs::ABORT) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK OK aborted"); return; }
-    if (k.kind != pk::sfs::CHUNK || k.size > c.size - got) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR chunk"); return; }
+    if (k.kind != pk::sfs::CHUNK || k.size > c.size - got) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR chunk"); diskDrain(); return; }
     size_t have = 0;
     uint32_t t = millis();
     while (have < k.size && millis() - t < 8000) {
@@ -1913,31 +1920,41 @@ static void diskPut(const pk::sfs::Cmd& c) {
     }
     if (have < k.size) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR timeout"); return; }
     if (pk::sfs::crcDone(pk::sfs::crcUpdate(pk::sfs::CRC_START, buf, k.size)) != k.crc) { Serial.println("DISK ERR crc"); continue; }  // the host sends it again
-    if (f.write(buf, k.size) != k.size) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR write"); return; }
+    if (f.write(buf, k.size) != k.size) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR write"); diskDrain(); return; }
     whole = pk::sfs::crcUpdate(whole, buf, k.size);
     got += k.size;
     Serial.printf("DISK OK %lu\n", (unsigned long)got);
   }
   f.close();
   if (pk::sfs::crcDone(whole) != c.crc) { LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR filecrc"); return; }
+  {  // the bytes must be a game the list can show (what addBoardGame would accept), not just any file with a good name
+    File t = LittleFS.open("/games/UPLOAD.TMP", "r");
+    GameEntry g = {};
+    bool ok = t && gmpEntry(t, c.name, false, g);
+    if (t) t.close();
+    if (!ok) { LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR notgmp"); return; }
+  }
   if (!LittleFS.rename("/games/UPLOAD.TMP", path)) { LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR rename"); return; }
   Serial.printf("DISK DONE %s %lu\n", c.name, (unsigned long)c.size);
 }
 static void diskOrder(uint32_t count) {
-  static char names[64][16];
+  // On the heap, only while the list is written: 256 names in .bss would not fit the ESP32's DRAM.
+  char (*names)[16] = count ? (char (*)[16])malloc((size_t)count * 16) : nullptr;
+  if (count && !names) { Serial.println("DISK ERR memory"); diskDrain(); return; }
   Serial.println("DISK GO");
   char line[40];
   for (uint32_t i = 0; i < count; i++) {
-    if (!diskLine(line, sizeof line, 8000)) { Serial.println("DISK ERR timeout"); return; }
-    if (!pk::sfs::gmpName(line)) { Serial.println("DISK ERR name"); return; }  // the lines are read to the end only when they are good
+    if (!diskLine(line, sizeof line, 8000)) { free(names); Serial.println("DISK ERR timeout"); return; }
+    if (!pk::sfs::gmpName(line)) { free(names); Serial.println("DISK ERR name"); diskDrain(); return; }  // the lines are read to the end only when they are good
     strcpy(names[i], line);
   }
   LittleFS.mkdir("/games");
   File f = LittleFS.open("/games/ORDER.NEW", "w");
-  if (!f) { Serial.println("DISK ERR open"); return; }
+  if (!f) { free(names); Serial.println("DISK ERR open"); return; }
   bool ok = true;
   for (uint32_t i = 0; i < count; i++) ok = ok && f.printf("%s\n", names[i]) > 0;
   f.close();
+  free(names);
   if (!ok || !LittleFS.rename("/games/ORDER.NEW", "/games/ORDER.TXT")) { LittleFS.remove("/games/ORDER.NEW"); Serial.println("DISK ERR write"); return; }
   Serial.printf("DISK DONE ORDER.TXT %lu\n", (unsigned long)count);
 }
@@ -1946,7 +1963,7 @@ static void diskCommand(const char* buf) {
   if (c.kind == pk::sfs::BAD) { Serial.printf("DISK ERR %s\n", c.why); return; }
   if (c.kind == pk::sfs::ABORT || c.kind == pk::sfs::END || c.kind == pk::sfs::CHUNK) { Serial.println("DISK ERR no transfer"); return; }
   if (mode != PICKER) { Serial.println("DISK ERR busy"); return; }  // the game list only: not in play, Settings or the first run
-  stopCardScan();
+  if (c.kind != pk::sfs::HELLO) stopCardScan();  // a connecting page asks HELLO again and again: that must not restart a card scan
   switch (c.kind) {
     case pk::sfs::HELLO: Serial.printf("DISK HELLO 1 chunk=%lu max=%lu\n", (unsigned long)pk::sfs::CHUNK_MAX, (unsigned long)pk::sfs::FILE_MAX); break;
     case pk::sfs::LS: diskList(); break;
