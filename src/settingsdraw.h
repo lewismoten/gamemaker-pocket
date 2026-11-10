@@ -195,11 +195,11 @@ inline int perPage(Tab t) {  // as many rows as fit above the bottom edge
   int step = stacked(t) ? G.stackStep : G.lineStep, rowH = stacked(t) ? (int)(8 * G.nameSize) + 1 + G.stackChipH : G.lineChipH;
   return (H - G.y0 - rowH) / step + 1;
 }
-inline int pages(Tab t) { Item it[12]; int n = tabItems(t, it), p = perPage(t); return (n + p - 1) / p; }
+inline int pages(Tab t) { Item it[16]; int n = tabItems(t, it), p = perPage(t); return (n + p - 1) / p; }
 // The items on the showing page.
 inline int pageItems(const View& v, Item* out) {
   if (v.preview) return 0;
-  Item it[12];
+  Item it[16];
   int n = tabItems(v.tab, it), p = perPage(v.tab), k = 0;
   for (int i = v.page * p; i < n && k < p; i++) out[k++] = it[i];
   return k;
@@ -250,7 +250,7 @@ inline Hit hit(const View& v, int x, int y) {
     if (!PREVIEW && previewBtn().has(x, y)) { h.kind = K_PVOPEN; h.box = previewBtn(); return h; }
     if (pages(v.tab) > 1 && moreBox().has(x, y)) { h.kind = K_MORE; h.box = moreBox(); return h; }
   }
-  Item it[12];
+  Item it[16];
   int n = pageItems(v, it);
   for (int k = 0; k < n; k++) {
     if (it[k] == I_RESCAN && v.fromPause) continue;
@@ -417,7 +417,7 @@ template <class G_> void screen(G_& g, const View& v, const Values& vals, const 
                                 uint8_t dirs, uint8_t btn, uint8_t held) {
   g.fillScreen(C_BLACK);
   bar(g, v);
-  Item it[12];
+  Item it[16];
   int n = pageItems(v, it);
   for (int k = 0; k < n; k++) row(g, v.tab, k, it[k], vals, it[k] == I_RESCAN && v.fromPause);
   if (v.tab == T_CARD) cardLines(g, card);

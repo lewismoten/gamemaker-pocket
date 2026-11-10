@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
     for (size_t j = i + 1; j < bar.size(); j++) if (overlap(b, bar[j]) || (j == i + 1 && bar[j].x0 - b.x1 < 4)) fail("bar buttons need a four-pixel gap");
   }
   for (int t = 0; t < st::T_COUNT; t++) {
-    st::Item all[12];
+    st::Item all[16];
     int n = st::tabItems((st::Tab)t, all), seen = 0;
     for (int page = 0; page < st::pages((st::Tab)t); page++) {
       for (int pause = 0; pause < 2; pause++) {
@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
           if (st::hit(v, (m.x0 + m.x1) / 2, (m.y0 + m.y1) / 2).kind != st::K_MORE) fail("More is not found");
           boxes.push_back(m);
         }
-        st::Item it[12];
+        st::Item it[16];
         int k = st::pageItems(v, it);
         if (!pause) seen += k;
         for (int i = 0; i < k; i++) {
