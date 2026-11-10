@@ -18,8 +18,9 @@ export function crc32(bytes) {
 const hex8 = (n) => n.toString(16).padStart(8, '0');
 export const BLOCK = 4096;
 export const roundUp = (n) => Math.ceil(n / BLOCK) * BLOCK;
-// The same rule as the firmware's `fits`: two spare blocks stay free, a file it replaces gives its space back.
-export const fits = (size, replaced, free) => size > 0 && roundUp(size) + 2 * BLOCK <= free + roundUp(replaced);
+// The same rule as the firmware's `fits`: two spare blocks stay free. A file it replaces is NOT credited: the old copy stays
+// until the new one is complete and renamed over it, so for a while both are on the board.
+export const fits = (size, replaced, free) => size > 0 && roundUp(size) + 2 * BLOCK <= free;
 // "My Game 2.gmp" becomes MYGAME2.GMP: upper case, only A-Z 0-9 _ -, at most 8 characters before .GMP; '' if nothing is left.
 export function boardName(fileName) {
   const base = fileName.replace(/\.[^.]*$/, '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 8);
@@ -31,25 +32,31 @@ export class Board {
   static supported() { return 'serial' in navigator; }
   async connect(onStatus = () => {}) {
     this.port = await navigator.serial.requestPort();
-    await this.port.open({ baudRate: 115200, bufferSize: 8192 });
-    try { await this.port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch (e) { /* not every adapter lets it */ }
-    this.writer = this.port.writable.getWriter();
-    this.reading = this.pump();
-    const end = Date.now() + 12000;
-    while (Date.now() < end) {
-      onStatus(Date.now() - (end - 12000) > 2500 ? 'Waiting for the board (it may be restarting)...' : 'Asking the board...');
-      await this.send('DISK HELLO');
-      const l = await this.line((x) => x.startsWith('DISK '), 900).catch(() => null);
-      if (!l) continue;
-      const m = /^DISK HELLO 1 chunk=(\d+) max=(\d+)/.exec(l);
-      if (m) { this.chunk = +m[1]; this.max = +m[2]; return; }
-      if (l.startsWith('DISK ERR busy')) throw new Error('The board is not on its game list. Close Settings, setup or the game, then connect again.');
+    try {
+      await this.port.open({ baudRate: 115200, bufferSize: 8192 });
+    } catch (e) { this.port = null; throw e; }
+    try {
+      try { await this.port.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch (e) { /* not every adapter lets it */ }
+      this.writer = this.port.writable.getWriter();
+      this.reading = this.pump();
+      const end = Date.now() + 12000;
+      while (Date.now() < end) {
+        onStatus(Date.now() - (end - 12000) > 2500 ? 'Waiting for the board (it may be restarting)...' : 'Asking the board...');
+        await this.send('DISK HELLO');
+        const l = await this.line((x) => x.startsWith('DISK '), 900).catch(() => null);
+        if (!l) continue;
+        const m = /^DISK HELLO 1 chunk=(\d+) max=(\d+)/.exec(l);
+        if (m) { this.chunk = +m[1]; this.max = +m[2]; return; }
+        if (l.startsWith('DISK ERR busy')) throw new Error('The board is not on its game list. Close Settings, setup or the game, then connect again.');
+      }
+      throw new Error("The board didn't answer. This works only after the firmware is installed (Install tab), and the board must show its game list. Older firmware doesn't have this feature.");
+    } catch (e) {
+      await this.close();  // every way out leaves the port closed, so Connect works again without a reload
+      throw e;
     }
-    await this.close();
-    throw new Error("The board didn't answer. This works only after the firmware is installed (Install tab), and the board must show its game list. Older firmware doesn't have this feature.");
   }
   async pump() {
-    const reader = this.port.readable.getReader();
+    const reader = (this.reader = this.port.readable.getReader());
     const dec = new TextDecoder();
     let buf = '';
     try {
@@ -91,7 +98,7 @@ export class Board {
   }
   async send(text) { await this.writer.write(new TextEncoder().encode(text + '\n')); }
   async expect(prefix, ms) {
-    const l = await this.line((x) => x.startsWith('DISK '), ms);
+    const l = await this.line((x) => x.startsWith('DISK ') && !x.startsWith('DISK HELLO'), ms);  // a late answer to a connect retry is not ours
     if (l.startsWith('DISK ERR')) throw new Error('Board: ' + l.slice(9));
     if (!l.startsWith('DISK ' + prefix)) throw new Error('Unexpected answer: ' + l);
     return l;
@@ -146,9 +153,16 @@ export class Board {
     await this.expect('DONE', 6000);
   }
   async rescan() { this.lines.length = 0; await this.send('DISK RESCAN'); await this.expect('DONE', 15000); }
+  // Cancels the reader and waits for the pump to let go of it, releases the writer, then closes the port (Web Serial refuses to
+  // close a port whose streams are still locked).
   async close() {
-    try { this.writer && this.writer.releaseLock(); } catch (e) { /* ok */ }
-    try { await this.port.close(); } catch (e) { /* ok */ }
+    const port = this.port;
     this.port = null;
+    if (!port) return;
+    try { if (this.reader) await this.reader.cancel(); } catch (e) { /* already gone */ }
+    try { if (this.reading) await this.reading; } catch (e) { /* ok */ }
+    try { if (this.writer) this.writer.releaseLock(); } catch (e) { /* ok */ }
+    this.reader = this.writer = this.reading = null;
+    try { await port.close(); } catch (e) { /* unplugged */ }
   }
 }
