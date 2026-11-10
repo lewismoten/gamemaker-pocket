@@ -1200,6 +1200,11 @@ static st::Values settingsValues() {
 // The whole screen. On Controls the controls model is set up for the preview (a game sets it up again as it starts or resumes).
 static void drawSettings() {
 #ifdef POCKET_CYD28
+  Serial.println(picOpen ? "SCREEN picture" : "SCREEN settings");
+#else
+  Serial.println("SCREEN settings");
+#endif
+#ifdef POCKET_CYD28
   if (picOpen) { drawPicture(); return; }
 #endif
   st::CardInfo card;
@@ -1218,7 +1223,7 @@ static void drawSettings() {
 }
 
 static ovl::PauseArm pauseArm;
-static void drawPause() { ovl::pauseMenu(tft, cfg.title, world.level, pauseArm.armed); }
+static void drawPause() { Serial.println("SCREEN pause"); ovl::pauseMenu(tft, cfg.title, world.level, pauseArm.armed); }
 
 static uint32_t t0 = 0, ticksRun = 0;
 static int curGame = -1;
@@ -2651,7 +2656,7 @@ void loop() {
           break;
         case ovl::PA_RESTART_LEVEL: restartLevel(); break;
         case ovl::PA_RESTART_GAME: if (!launchGame(curGame)) enterPicker(); break;
-        case ovl::PA_HELP: mode = HELP_SCREEN; ovl::helpPage(tft, cfg); wasDown = true; break;
+        case ovl::PA_HELP: Serial.println("SCREEN help"); mode = HELP_SCREEN; ovl::helpPage(tft, cfg); wasDown = true; break;
         case ovl::PA_SETTINGS: openSettings(true); break;
         case ovl::PA_QUIT: enterPicker(); break;  // the resume point stays: Continue on the home page
         default: break;
@@ -2666,7 +2671,8 @@ void loop() {
     return;
   }
   if (mode == HELP_SCREEN) {
-    if (freshTap(tx, ty)) { pauseArm.armed = -1; mode = PAUSED; tft.fillScreen(C_BLACK); last.valid = false; drawFrame(true); drawStrip(); drawPause(); wasDown = true; }
+    // The Close X closes Help; so does the BOOT button (a way out with no touch).
+    if ((freshTap(tx, ty) && cx::hit(scr::W, tx, ty)) || digitalRead(0) == LOW) { pauseArm.armed = -1; mode = PAUSED; tft.fillScreen(C_BLACK); last.valid = false; drawFrame(true); drawStrip(); drawPause(); wasDown = true; }
     delay(5);
     return;
   }

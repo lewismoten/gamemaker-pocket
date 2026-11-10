@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include "closex.h"
 #include "overlaydraw.h"
 #include "screen.h"
 
@@ -74,7 +75,7 @@ inline bool valid(int gamma, int tune) { return gamma >= 0 && gamma < GAMMAS && 
 // chips: Gamma 1 to 4 and Tuning Std, Alt 1, Alt 2, Alt 3. Every choice is sent to the glass at once.
 struct Box { int x0, y0, x1, y1; bool has(int x, int y) const { return x >= x0 && x < x1 && y >= y0 && y < y1; } };
 constexpr int BAR_H = scr::SMALL ? 38 : 44, ROW_H = scr::SMALL ? 36 : 48, GAP = 4;
-inline Box backBox() { return {2, 0, 2 + (scr::SMALL ? 40 : 56), BAR_H - 2}; }
+inline Box backBox() { cx::Rect b = cx::box(scr::W); return {b.x0, b.y0, b.x1, b.y1}; }  // the Close X (closex.h)
 inline int rowY(int r) { return scr::H - 2 * (ROW_H + GAP) + r * (ROW_H + GAP); }  // 0 Gamma, 1 Tuning
 inline Box chipBox(int r, int k) {
   int x0 = scr::W * 30 / 100, w = (scr::W - 4 - x0 - 3 * GAP) / 4;
@@ -140,12 +141,12 @@ template <class G_> void rows(G_& g, int gamma, int tune) {
 template <class G_> void screen(G_& g, int gamma, int tune, const char* driver) {
   g.fillScreen(C_BLACK);
   Box b = backBox();
-  ovl::button(g, b.x0, b.y0, b.x1, b.y1, "<", false, C_DARK, scr::SMALL ? 1 : 2);
+  cx::draw(g, scr::W);
   g.setTextSize(scr::SMALL ? 2 : 2);
   g.setTextColor(C_WHITE, C_BLACK);
-  g.setCursor(b.x1 + 8, (BAR_H - 16) / 2);
+  g.setCursor(8, (BAR_H - 16) / 2);
   g.print("Picture");
-  label(g, scr::W - 6 * (int)strlen(driver) - 6, (BAR_H - 8) / 2, driver, C_GRAY, C_BLACK);
+  label(g, b.x0 - 6 * (int)strlen(driver) - 8, (BAR_H - 8) / 2, driver, C_GRAY, C_BLACK);
   g.fillRect(0, BAR_H - 2, scr::W, 2, C_BLUE);
   testCard(g);
   rows(g, gamma, tune);

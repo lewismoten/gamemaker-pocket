@@ -69,12 +69,13 @@ int main(int argc, char** argv) {
   const char* wn = scr::SMALL ? "320" : "480";
   int buttons = 0, shots = 0;
   // the bar
-  std::vector<st::Box> bar = {st::backBox()};
+  std::vector<st::Box> bar;  // the tabs left to right, then the Close X at the right end
   for (int t = 0; t < st::T_COUNT; t++) {
     st::Box b = st::tabBox(t);
     if ((int)(strlen(st::tabName(t)) * 6 * st::G.tabSize) > b.x1 - b.x0 - 4) fail(std::string("tab label too wide: ") + st::tabName(t));
     bar.push_back(b);
   }
+  bar.push_back(st::backBox());
   for (size_t i = 0; i < bar.size(); i++) {
     const st::Box& b = bar[i];
     if (b.x1 - b.x0 < 36 || b.y1 - b.y0 < 36 || b.x0 < 0 || b.x1 > scr::W || b.y1 > st::G.barH) fail("bar button small or off screen");

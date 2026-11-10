@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "controls.h"
+#include "closex.h"
 #include "overlaydraw.h"
 #include "paddraw.h"
 #include "screen.h"
@@ -205,11 +206,11 @@ inline int pageItems(const View& v, Item* out) {
   return k;
 }
 struct Box { int x0, y0, x1, y1; bool has(int x, int y) const { return x >= x0 && x < x1 && y >= y0 && y < y1; } };
-inline Box backBox() { return {2, (G.barH - G.tabH) / 2, 2 + G.backW, (G.barH - G.tabH) / 2 + G.tabH}; }
+inline Box backBox() { cx::Rect b = cx::box(W); return {b.x0, b.y0, b.x1, b.y1}; }  // the Close X (closex.h), top right; the tabs fill the bar to its left
 inline Box tabBox(int t) {
   int base[T_COUNT], sum = 0;
   for (int i = 0; i < T_COUNT; i++) { base[i] = (int)(strlen(tabName(i)) * 6 * G.tabSize) + 10; sum += base[i]; }
-  int x = backBox().x1 + 4, room = W - 2 - x - 3 * 4, extra = (room - sum) / T_COUNT;
+  int x = 2, room = backBox().x0 - 4 - x - 3 * 4, extra = (room - sum) / T_COUNT;
   for (int i = 0; i < t; i++) x += base[i] + extra + 4;
   return {x, backBox().y0, x + base[t] + extra, backBox().y1};
 }
@@ -301,7 +302,8 @@ template <class G_> void button(G_& g,int x0,int y0,int x1,int y1,const char* la
 template <class G_> void bar(G_& g, const View& v) {
   g.fillRect(0, 0, W, G.barH, 0x0863);
   Box b = backBox();
-  button(g, b.x0, b.y0, b.x1, b.y1, "Back", false, C_DARK, G.tabSize);
+  (void)b;
+  cx::draw(g, W);
   for (int t = 0; t < T_COUNT; t++) {
     Box tb = tabBox(t);
     bool on = t == v.tab;

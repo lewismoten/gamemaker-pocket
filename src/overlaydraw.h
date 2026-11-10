@@ -10,6 +10,7 @@
 #include <string.h>
 #include "banner.h"
 #include "btnicon.h"
+#include "closex.h"
 #include "controls.h"
 #include "favorites.h"
 #include "gmcfg.h"
@@ -110,7 +111,8 @@ template <class G> void pauseMenu(G& tft, const char* game, int level, int armed
 
 // ---- How to play: the keys the game lists (its controls.json labels, packed as the .cfg's `key` lines) ----
 // A letter the controls treat as an arrow (A for Left) is left out when the arrow is listed too. Any tap goes back.
-constexpr int HELP_TOP = scr::SMALL ? 26 : 34, HELP_Y0 = scr::SMALL ? 34 : 44, HELP_BACK_Y = scr::SMALL ? 208 : 282;
+// The header is as tall as the Close X band; the key list runs to the bottom edge (the old bottom Back is the X now).
+constexpr int HELP_TOP = scr::SMALL ? 38 : 42, HELP_Y0 = HELP_TOP + 8, HELP_BACK_Y = scr::H;
 inline bool helpAlias(const gm::Cfg& cfg, int i) {
   int s = cfg.keys[i].scan, as = ctl::needScan(s);
   for (int j = 0; j < cfg.nkeys && as != s; j++) if (cfg.keys[j].scan == as) return true;
@@ -125,8 +127,9 @@ template <class G> void helpPage(G& tft, const gm::Cfg& cfg) {
   tft.fillRect(0, 0, scr::W, HELP_TOP, C_DARK);
   tft.setTextSize(2);
   tft.setTextColor(C_WHITE, C_DARK);
-  tft.setCursor(8, scr::SMALL ? 5 : 9);
+  tft.setCursor(8, (HELP_TOP - 16) / 2);
   tft.print("How to play");
+  cx::draw(tft, scr::W);
   int cw = 6 * HELP_SIZE, y = HELP_Y0, shown = 0;
   tft.setTextSize(HELP_SIZE);
   for (int i = 0; i < cfg.nkeys && y + 8 * HELP_SIZE <= HELP_BACK_Y - 4; i++) {
@@ -146,7 +149,6 @@ template <class G> void helpPage(G& tft, const gm::Cfg& cfg) {
     tft.setCursor(8, y);
     tft.print("No keys listed: walk with the pad.");
   }
-  button(tft, 0, HELP_BACK_Y, scr::W, scr::H, "Back", false, C_DARK);
 }
 
 template <class Spr> struct Overlay {
