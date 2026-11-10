@@ -1938,20 +1938,23 @@ static void diskPut(const pk::sfs::Cmd& c) {
   Serial.printf("DISK DONE %s %lu\n", c.name, (unsigned long)c.size);
 }
 static void diskOrder(uint32_t count) {
-  static char names[pk::sfs::ORDER_MAX][16];
+  // On the heap, only while the list is written: 256 names in .bss would not fit the ESP32's DRAM.
+  char (*names)[16] = count ? (char (*)[16])malloc((size_t)count * 16) : nullptr;
+  if (count && !names) { Serial.println("DISK ERR memory"); diskDrain(); return; }
   Serial.println("DISK GO");
   char line[40];
   for (uint32_t i = 0; i < count; i++) {
-    if (!diskLine(line, sizeof line, 8000)) { Serial.println("DISK ERR timeout"); return; }
-    if (!pk::sfs::gmpName(line)) { Serial.println("DISK ERR name"); diskDrain(); return; }  // the lines are read to the end only when they are good
+    if (!diskLine(line, sizeof line, 8000)) { free(names); Serial.println("DISK ERR timeout"); return; }
+    if (!pk::sfs::gmpName(line)) { free(names); Serial.println("DISK ERR name"); diskDrain(); return; }  // the lines are read to the end only when they are good
     strcpy(names[i], line);
   }
   LittleFS.mkdir("/games");
   File f = LittleFS.open("/games/ORDER.NEW", "w");
-  if (!f) { Serial.println("DISK ERR open"); return; }
+  if (!f) { free(names); Serial.println("DISK ERR open"); return; }
   bool ok = true;
   for (uint32_t i = 0; i < count; i++) ok = ok && f.printf("%s\n", names[i]) > 0;
   f.close();
+  free(names);
   if (!ok || !LittleFS.rename("/games/ORDER.NEW", "/games/ORDER.TXT")) { LittleFS.remove("/games/ORDER.NEW"); Serial.println("DISK ERR write"); return; }
   Serial.printf("DISK DONE ORDER.TXT %lu\n", (unsigned long)count);
 }
