@@ -85,21 +85,11 @@ int main(int argc, char** argv) {
   {  // search keyboard: its taps are in main.cpp's loop()
     Shot g(W, H);
     pk::drawKeyboard(g, W, H, 32, "TIN");
-    pk::drawButton(g, 0, 0, 40, 32, "<");
-#ifdef HIT_BEFORE
-    pk::drawButton(g, 42, 0, W, 32, "All games");
-#else
-    pk::drawButton(g, 44, 0, W, 32, "All games");
-#endif
+    pk::drawSearchHeader(g, W, true);
     pk::drawSmallIcon(g, 0, 50, 8, true);
     Rects rs;
-#ifdef HIT_BEFORE
-    rs.push_back({0, 0, 40, 32}); rs.push_back({40, 0, W, 32});
-    for (int k = 0; k < 4; k++) rs.push_back({k * W / 4, H - 36, (k + 1) * W / 4, H});
-#else
-    rs.push_back({0, 0, 40, pk::SEARCH_HEADER_HIT_H}); rs.push_back({44, 0, W, pk::SEARCH_HEADER_HIT_H});
-    for (int k = 0; k < 4; k++) { int x0 = -1, x1 = -1; for (int x = 0; x < W; x++) if (pk::keyboardAction(W, x) == k) { if (x0 < 0) x0 = x; x1 = x + 1; } rs.push_back({x0, H - 36, x1, H}); }
-#endif
+    rs.push_back({0, 0, pk::SEARCH_BACK_W, pk::SEARCH_HEADER_HIT_H}); rs.push_back({pk::SEARCH_SCOPE_X0, 0, pk::searchScopeX1(W), pk::SEARCH_HEADER_HIT_H}); rs.push_back({W - pk::SEARCH_CLEAR_W, 0, W, pk::SEARCH_HEADER_HIT_H});
+    for (int k = 0; k < 3; k++) { int x0 = -1, x1 = -1; for (int x = 0; x < W; x++) if (pk::keyboardAction(W, x) == k) { if (x0 < 0) x0 = x; x1 = x + 1; } rs.push_back({x0, H - 36, x1, H}); }
     int top = 58, step = (H - top - 38) / 4;  // a key is the whole cell tx*9/W by (ty-top)/step
     for (int i = 0; i < 36; i++) rs.push_back({i % 9 * W / 9, top + i / 9 * step, (i % 9 + 1) * W / 9, top + (i / 9 + 1) * step});
     save(dir, name("search"), g, rs);
@@ -107,7 +97,7 @@ int main(int argc, char** argv) {
   {  // pause menu
     Shot g(W, H);
     g.fillRect(0, 0, W, H, 0x2104);
-    ovl::pauseMenu(g, "Moving and Pushing", 1, 0, -1);
+    ovl::pauseMenu(g, "Moving and Pushing", 1, -1);
     Rects rs;
     for (int i = 0; i <= ovl::PA_COUNT; i++) { int x0, y0, x1, y1; ovl::pauseCell(i, x0, y0, x1, y1); rs.push_back({x0, y0, x1, y1}); }
     save(dir, name("pause"), g, rs);

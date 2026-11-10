@@ -4,12 +4,32 @@
 #include "picker.h"
 namespace pk {
 constexpr uint16_t C_WHITE = 0xFFFF, C_BLACK = 0x10A5, C_YELLOW = 0xFEAA, C_GRAY = 0xA5B9, C_DARK = 0x1927;
+// Search keyboard colors: action keys (Space, Del, Done, back, clear) are blue with a yellow frame; vowels are light green.
+constexpr uint16_t C_ACTION = 0x2A9A, C_VOWEL = 0x87F0;
 // on=false draws it gray: a button that would do nothing now (the first page's back arrow, Details with no game picked).
 template <class G> void drawButton(G& g, int x0, int y0, int x1, int y1, const char* label, bool on = true) {
   g.fillRoundRect(x0, y0, x1 - x0, y1 - y0, 6, C_DARK);
   g.drawRoundRect(x0, y0, x1 - x0, y1 - y0, 6, on ? C_WHITE : C_GRAY);
   g.setTextSize(2); g.setTextColor(on ? C_WHITE : C_GRAY, C_DARK);
   g.setCursor((x0 + x1) / 2 - (int)strlen(label) * 6, (y0 + y1) / 2 - 8); g.print(label);
+}
+// An action key (Space, Del, Done, back, clear): blue with a double yellow frame, so it never reads as a letter.
+template <class G> void drawActionButton(G& g, int x0, int y0, int x1, int y1, const char* label) {
+  g.fillRoundRect(x0, y0, x1 - x0, y1 - y0, 6, C_ACTION);
+  g.drawRoundRect(x0, y0, x1 - x0, y1 - y0, 6, C_YELLOW);
+  g.drawRoundRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2, 5, C_YELLOW);
+  g.setTextSize(2); g.setTextColor(C_WHITE, C_ACTION);
+  g.setCursor((x0 + x1) / 2 - (int)strlen(label) * 6, (y0 + y1) / 2 - 8); g.print(label);
+}
+// A letter key whose vowel is tinted (text and frame) so the five vowels stand out.
+template <class G> void drawLetterKey(G& g, int x0, int y0, int x1, int y1, char c) {
+  bool v = c == 'A' || c == 'E' || c == 'I' || c == 'O' || c == 'U';
+  uint16_t ink = v ? C_VOWEL : C_WHITE;
+  g.fillRoundRect(x0, y0, x1 - x0, y1 - y0, 6, C_DARK);
+  g.drawRoundRect(x0, y0, x1 - x0, y1 - y0, 6, v ? C_VOWEL : C_WHITE);
+  g.setTextSize(2); g.setTextColor(ink, C_DARK);
+  char l[2] = {c, 0};
+  g.setCursor((x0 + x1) / 2 - 6, (y0 + y1) / 2 - 8); g.print(l);
 }
 // Icon buttons are 44 pixels wide or larger on both boards.
 template <class G> void drawIcon(G& tft, int slot, int W, int H, int footer) {
@@ -51,40 +71,50 @@ template <class G> void drawPageRow(G& tft, const char* text, bool sd, int W, in
   if (text) drawRow(tft, text, sd, W, y, height);
   else tft.fillRect(6, y, W - 12, height, C_BLACK);
 }
-// Preserve the common prefix and erase only the edited suffix and old caret. The keyboard
-// and title are painted once on entry; even Clear never clears beyond this 16-pixel line.
+// Preserve the common prefix and erase only the edited suffix and old caret. The keyboard and title are painted once on entry.
+// Empty, the field shows "Type a title" in gray as a hint (four pixels in, so the white caret sits clear of it); the caret is
+// always where the next character will appear.
+constexpr int SEARCH_HINT_SHIFT = 4;
 template <class G> void drawSearchText(G& tft, int titleH, const char* text, const char* previous = nullptr) {
   if (previous && !strcmp(text, previous)) return;
-  const char* shown = text[0] ? text : "Type a title";
-  const char* old = previous && previous[0] ? previous : "Type a title";
+  const char* hint = "Type a title";
+  bool hintNew = !text[0], hintOld = !(previous && previous[0]);
   size_t prefix = 0;
   if (previous && text[0] && previous[0])
     while (text[prefix] && text[prefix] == previous[prefix]) prefix++;
-  size_t width = strlen(shown), oldWidth = strlen(old);
-  if (oldWidth > width) width = oldWidth;
-  tft.fillRect(8 + prefix * 12, titleH + 4, (width - prefix) * 12 + 2, 16, C_BLACK);
-  tft.setTextSize(2); tft.setTextColor(C_WHITE, C_BLACK);
-  tft.setCursor(8 + prefix * 12, titleH + 4); tft.print(shown + prefix);
-  tft.fillRect(8 + strlen(shown) * 12, titleH + 4, 2, 16, C_WHITE);
+  int endNew = hintNew ? SEARCH_HINT_SHIFT + (int)strlen(hint) * 12 : (int)strlen(text) * 12 + 2;
+  int endOld = hintOld ? SEARCH_HINT_SHIFT + (int)strlen(hint) * 12 : (int)strlen(previous) * 12 + 2;
+  int end = endNew > endOld ? endNew : endOld;
+  tft.fillRect(8 + prefix * 12, titleH + 4, end - (int)prefix * 12, 16, C_BLACK);
+  tft.setTextSize(2);
+  if (hintNew) { tft.setTextColor(C_GRAY, C_BLACK); tft.setCursor(8 + SEARCH_HINT_SHIFT, titleH + 4); tft.print(hint); }
+  else { tft.setTextColor(C_WHITE, C_BLACK); tft.setCursor(8 + prefix * 12, titleH + 4); tft.print(text + prefix); }
+  tft.fillRect(8 + (int)strlen(text) * 12, titleH + 4, 2, 16, C_WHITE);
 }
 // The search header has four pixels of safe slop below its 32 px drawing.
 constexpr int SEARCH_HEADER_HIT_H = 36;
-// Keep the footer's visible four-pixel gutters inert, including during Backspace repeat.
+// Keep the footer's visible four-pixel gutters inert, including during Backspace repeat. Three keys: Space, Del, Done.
 inline int keyboardAction(int W, int x) {
   if (x < 0 || x >= W) return -1;
-  int k = x * 4 / W;
-  return x >= k * W / 4 + 2 && x < (k + 1) * W / 4 - 2 ? k : -1;
+  int k = x * 3 / W;
+  return x >= k * W / 3 + 2 && x < (k + 1) * W / 3 - 2 ? k : -1;
+}
+// The header: Back at the left, the scope button, and the clear key (an X, away from Del) at the right.
+constexpr int SEARCH_BACK_W = 40, SEARCH_CLEAR_W = 44, SEARCH_SCOPE_X0 = 44, SEARCH_SCOPE_GAP = 4;
+inline int searchScopeX1(int W) { return W - SEARCH_CLEAR_W - SEARCH_SCOPE_GAP; }
+template <class G> void drawSearchHeader(G& tft, int W, bool all) {
+  drawActionButton(tft, 0, 0, SEARCH_BACK_W, 32, "<");
+  drawButton(tft, SEARCH_SCOPE_X0, 0, searchScopeX1(W), 32, all ? "All games" : "This category");
+  drawActionButton(tft, W - SEARCH_CLEAR_W, 0, W, 32, "X");
 }
 template <class G> void drawKeyboard(G& tft, int W, int H, int titleH, const char* text) {
   tft.fillRect(0,0,W,H,C_BLACK);
   drawSearchText(tft, titleH, text);
   const char* keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   int top = titleH + 26, step = (H - top - 38) / 4;
-  for (int i = 0; i < 36; i++) {
-    char label[2] = {keys[i], 0};
-    drawButton(tft, i % 9 * W / 9 + 2, top + i / 9 * step, (i % 9 + 1) * W / 9 - 2, top + (i / 9 + 1) * step - 2, label);
-  }
-  for (int i = 0; i < 4; i++) drawButton(tft, i * W / 4 + 2, H - 36, (i + 1) * W / 4 - 2, H - 2, i == 0 ? "Space" : i == 1 ? "Del" : i == 2 ? "Clear" : "Done");
+  for (int i = 0; i < 36; i++)
+    drawLetterKey(tft, i % 9 * W / 9 + 2, top + i / 9 * step, (i % 9 + 1) * W / 9 - 2, top + (i / 9 + 1) * step - 2, keys[i]);
+  for (int i = 0; i < 3; i++) drawActionButton(tft, i * W / 3 + 2, H - 36, (i + 1) * W / 3 - 2, H - 2, i == 0 ? "Space" : i == 1 ? "Del" : "Done");
 }
 }  // namespace pk
 

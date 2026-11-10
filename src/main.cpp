@@ -703,8 +703,8 @@ static void saveSettings() {
   if (!f) return;
   // Older firmware reads these lines by their first letters ("pad" ...), so the newer keys share no prefix with the old ones and
   // come last: it skips them, and its own save drops them (the pad goes back to Low and Space to the corner).
-  f.printf("lefty=%d\nstylus=%d\npad=%d\ndead=%d\npalm=%d\ndebug=%d\nsound=%d\nraised=%d\njumpnear=%d\nfloat=%d\narcs=%d\nwedge=%d\n", settings.lefty, settings.stylus, settings.padSize,
-           settings.dead, settings.palm, settings.debug, settings.sound, settings.raised, settings.jumpNear, settings.floatPad, settings.arcs, settings.wedge);
+  f.printf("lefty=%d\nstylus=%d\npad=%d\ndead=%d\npalm=%d\ndebug=%d\nsound=%d\nraised=%d\njumpnear=%d\nfloat=%d\narcs=%d\nwedge=%d\nconfirmq=%d\n", settings.lefty, settings.stylus, settings.padSize,
+           settings.dead, settings.palm, settings.debug, settings.sound, settings.raised, settings.jumpNear, settings.floatPad, settings.arcs, settings.wedge, settings.confirmQuit);
 }
 static void loadSettings() {
   settings = ctl::Settings();
@@ -739,6 +739,7 @@ static void loadSettings() {
     else if (k == "float") settings.floatPad = v ? 1 : 0;
     else if (k == "arcs") settings.arcs = v ? 1 : 0;
     else if (k == "wedge") settings.wedge = v < 0 ? 0 : v > 2 ? 2 : v;
+    else if (k == "confirmq") settings.confirmQuit = v ? 1 : 0;
   }
   keepSettingsFile = pk::keepSettingsFile(existed, true, (long)f.position(), (long)f.size());
 }
@@ -1125,8 +1126,7 @@ static void drawPicker(bool clear = true, bool paging = false) {
 }
 static void drawSearch() {
   tft.fillScreen(C_BLACK);pk::drawKeyboard(tft,scr::W,scr::H,32,searchText);
-  pk::drawButton(tft,0,0,40,32,"<");
-  pk::drawButton(tft,44,0,scr::W,32,searchAll?"All games":"This category");
+  pk::drawSearchHeader(tft,scr::W,searchAll);
   pk::drawSmallIcon(tft,searchAll?0:18,50,8,true);
 }
 static int detailsMask = 0;  // the selected game's own pages (picker.h detailsPageSpan), read from its .cfg when Details opens
@@ -1214,9 +1214,8 @@ static void drawSettings() {
   banner::paint(tft, 0, 0);
 }
 
-static bool pausePinned = false;  // whether the paused game is a favorite (read from NVS as the game pauses)
 static ovl::PauseArm pauseArm;
-static void drawPause() { ovl::pauseMenu(tft, cfg.title, world.level, pausePinned ? 1 : 0, pauseArm.armed); }
+static void drawPause() { ovl::pauseMenu(tft, cfg.title, world.level, pauseArm.armed); }
 
 static uint32_t t0 = 0, ticksRun = 0;
 static int curGame = -1;
@@ -2437,7 +2436,6 @@ static void pauseGame() {
   applyKeys(millis());
   controls.reset();
   mode = PAUSED;
-  pausePinned = storedFavorite(activeGame.uid);
   drawPause();
   wasDown = true;
 }
@@ -2579,8 +2577,8 @@ void loop() {
     if (freshTap(tx, ty)) {
       char previous[sizeof searchText];memcpy(previous,searchText,sizeof previous);
       int n=strlen(searchText),top=58,step=(scr::H-top-38)/4;
-      if(ty<pk::SEARCH_HEADER_HIT_H){if(tx<40){strcpy(searchText,savedSearch);searchAll=savedAll;browsingCategories=savedBrowsing;mode=PICKER;drawPicker();return;}if(tx>=44){searchAll=!searchAll;drawSearch();}}
-      else if(ty>=scr::H-36){int b=pk::keyboardAction(scr::W,tx);if(b==0&&n<24){searchText[n]=' ';searchText[n+1]=0;}if(b==1&&n){searchText[n-1]=0;bkOn=true;bkNext=now+prs::REPEAT_DELAY_MS;}if(b==2)searchText[0]=0;if(b==3){page=0;selected=-1;browsingCategories=false;mode=PICKER;drawPicker();return;}}
+      if(ty<pk::SEARCH_HEADER_HIT_H){if(tx<40){strcpy(searchText,savedSearch);searchAll=savedAll;browsingCategories=savedBrowsing;mode=PICKER;drawPicker();return;}if(tx>=scr::W-pk::SEARCH_CLEAR_W){searchText[0]=0;}else if(tx>=pk::SEARCH_SCOPE_X0&&tx<pk::searchScopeX1(scr::W)){searchAll=!searchAll;drawSearch();}}
+      else if(ty>=scr::H-36){int b=pk::keyboardAction(scr::W,tx);if(b==0&&n<24){searchText[n]=' ';searchText[n+1]=0;}if(b==1&&n){searchText[n-1]=0;bkOn=true;bkNext=now+prs::REPEAT_DELAY_MS;}if(b==2){page=0;selected=-1;browsingCategories=false;mode=PICKER;drawPicker();return;}}
       else if(ty>=top&&ty<top+4*step&&n<24){searchText[n]="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[(ty-top)/step*9+tx*9/scr::W];searchText[n+1]=0;}
       pk::drawSearchText(tft,32,searchText,previous);
     }else if(bkOn){  // Backspace held: it repeats (400 ms, then 8 a second) while the finger stays on it
@@ -2640,7 +2638,7 @@ void loop() {
     if (pauseArm.expire(millis())) drawPause();
     if (menuTap(prs::SC_PAUSE, tx, ty)) {
       int hit = ovl::pauseHit(tx, ty), was = pauseArm.armed;
-      int act = pauseArm.tap(hit, millis());
+      int act = pauseArm.tap(hit, millis(), settings.confirmQuit != 0);
       if (act == ovl::ARM_ARMED) { drawPause(); wasDown = true; return; }
       if (act == ovl::ARM_NONE) { if (was >= 0) drawPause(); return; }
       switch (hit) {
@@ -2653,20 +2651,6 @@ void loop() {
         case ovl::PA_HELP: mode = HELP_SCREEN; ovl::helpPage(tft, cfg); wasDown = true; break;
         case ovl::PA_SETTINGS: openSettings(true); break;
         case ovl::PA_QUIT: enterPicker(); break;  // the resume point stays: Continue on the home page
-        case ovl::PA_STAR: {  // star or unstar this game; the title line says what happened until the next redraw
-          int r = toggleFavorite(activeGame.uid);
-          if (r == pk::PIN_ADDED || r == pk::PIN_REMOVED) pausePinned = r == pk::PIN_ADDED;
-          drawPause();
-          const ovl::PauseGeom& p = ovl::PAUSE;
-          int sx0, sy0, sx1, sy1;
-          ovl::pauseCell(ovl::PA_STAR, sx0, sy0, sx1, sy1);
-          tft.fillRect(p.x0, sy0 + 1, sx0 - 2 - p.x0, sy1 - sy0 - 2, C_BLACK);
-          tft.setTextSize(1);
-          tft.setTextColor(C_YELLOW, C_BLACK);
-          tft.setCursor(p.x0, p.titleY);
-          tft.print(pinMessage(r));
-          break;
-        }
         default: break;
       }
     }

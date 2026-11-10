@@ -134,7 +134,6 @@ struct Press {
 };
 // The pause menu's pressed look: the whole button yellow with its label in black (the same button, drawn hot).
 template <class G> void drawPausePressed(G& g, int i, int armed = -1) {
-  if (i == ovl::PA_STAR) { ovl::pauseStar(g, false, true); return; }
   int x0, y0, x1, y1;
   ovl::pauseCell(i, x0, y0, x1, y1);
   ovl::button(g, x0, y0, x1, y1, ovl::pauseLabel(i, i == armed, ovl::PAUSE.colW, ovl::PAUSE.textSize), true, ovl::C_DARK, ovl::PAUSE.textSize);

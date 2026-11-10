@@ -46,9 +46,9 @@ int main(int argc,char** argv) {
   for(int x=54;x<58;x++) {
     prs::Rect r;assert(!prs::under(c,x,g.H-10,r));
   }
-  for(int k=0;k<4;k++)for(int x=k*g.W/4;x<(k+1)*g.W/4;x++) {
+  for(int k=0;k<3;k++)for(int x=k*g.W/3;x<(k+1)*g.W/3;x++) {
     int action=pk::keyboardAction(g.W,x);
-    assert(action==(x>=k*g.W/4+2&&x<(k+1)*g.W/4-2?k:-1));
+    assert(action==(x>=k*g.W/3+2&&x<(k+1)*g.W/3-2?k:-1));
   }
   assert(pk::keyboardAction(g.W,-1)==-1&&pk::keyboardAction(g.W,g.W)==-1);
   assert(pk::SEARCH_HEADER_HIT_H>=36&&pk::SEARCH_HEADER_HIT_H<=58);

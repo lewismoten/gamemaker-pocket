@@ -70,6 +70,7 @@ struct Settings {
 #else
   uint8_t arcs = 0;      // the 3.5 inch board has two-finger touch, so the arcs are an option there
 #endif
+  uint8_t confirmQuit = 1;  // Quit to library from the pause menu needs a second tap (1, the default) or acts at once (0)
   uint8_t wedge = 1;     // how wide the jump wedge is: 0 narrow (about 20 degrees), 1 normal (37), 2 wide (50)
 };
 // The jump wedge's slopes (times 100): a finger is "level" within `level` of the horizontal, "upright" within `upright` of the

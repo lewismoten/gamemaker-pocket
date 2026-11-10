@@ -170,7 +170,9 @@ int main() {
     }
     {  // Restart level and Restart game: the first tap arms (3 s), the second acts; another button, a miss or the time disarms; Resume is one tap
       ovl::PauseArm a;
-      assert(a.tap(ovl::PA_RESUME, 100) == ovl::ARM_ACT && a.tap(ovl::PA_QUIT, 100) == ovl::ARM_ACT && a.tap(-1, 100) == ovl::ARM_NONE);
+      assert(a.tap(ovl::PA_RESUME, 100) == ovl::ARM_ACT && a.tap(ovl::PA_QUIT, 100, false) == ovl::ARM_ACT && a.tap(-1, 100) == ovl::ARM_NONE);
+      assert(a.tap(ovl::PA_QUIT, 100) == ovl::ARM_ARMED && a.tap(ovl::PA_QUIT, 200) == ovl::ARM_ACT);  // Confirm Quit: two taps
+      assert(!strncmp(ovl::pauseLabel(ovl::PA_QUIT, true, ovl::PAUSE.colW, ovl::PAUSE.textSize), "Tap", 3));
       for (int r : {ovl::PA_RESTART_LEVEL, ovl::PA_RESTART_GAME}) {
         assert(a.tap(r, 1000) == ovl::ARM_ARMED && a.armed == r);
         assert(!a.expire(4000) && a.expire(4001) && a.armed == -1);  // 3 seconds, then it is plain again
@@ -187,14 +189,6 @@ int main() {
         assert(!strncmp(l, "Tap", 3) && (int)(strlen(l) * 6 * ovl::PAUSE.textSize) + 8 <= ovl::PAUSE.colW);
         assert(!strcmp(ovl::pauseLabel(i, false, ovl::PAUSE.colW, ovl::PAUSE.textSize), ovl::pauseItem(i)));
       }
-    }
-    {  // the Favorite star on the title line: at least 24 x 24, inside the box, clear of the six buttons
-      int x0, y0, x1, y1;
-      ovl::pauseCell(ovl::PA_STAR, x0, y0, x1, y1);
-      prs::Rect r;
-      assert(x1 - x0 >= 24 && y1 - y0 >= 24 && x1 <= scr::W && y0 >= 0 && y1 <= ovl::PAUSE.y0);
-      assert(prs::under(c, (x0 + x1) / 2, (y0 + y1) / 2, r) && r.x0 == x0 && r.y1 == y1);
-      assert(ovl::pauseHit((x0 + x1) / 2, (y0 + y1) / 2) == ovl::PA_STAR && ovl::pauseHit((x0 + x1) / 2, (y0 + y1) / 2, false) == -1);
     }
     c.screen = prs::SC_SETTINGS;  // Back and the four tabs (host/settingstest.cpp checks every chip and More)
     c.settings = st::View();

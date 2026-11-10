@@ -16,7 +16,7 @@
 namespace st {
 constexpr uint16_t C_WHITE = 0xFFFF, C_BLACK = 0x10A5, C_YELLOW = 0xFEAA, C_GRAY = 0xA5B9, C_DARK = 0x1927, C_BLUE = 0x7DDF, C_VIEW = 0x10A6;
 enum Tab : uint8_t { T_CONTROLS, T_DISPLAY, T_SOUND, T_CARD, T_COUNT };
-enum Item : uint8_t { I_HAND, I_PAD, I_DEAD, I_POS, I_JUMP, I_STYLUS, I_STICKY, I_PALM, I_CAL, I_BRIGHT, I_SMALLER, I_DEBUG, I_LED, I_PANEL, I_SOUND, I_CLICKS, I_RESCAN, I_TRY, I_ARCS, I_WEDGE, I_NONE };
+enum Item : uint8_t { I_HAND, I_PAD, I_DEAD, I_POS, I_JUMP, I_STYLUS, I_STICKY, I_PALM, I_CAL, I_BRIGHT, I_SMALLER, I_DEBUG, I_LED, I_PANEL, I_SOUND, I_CLICKS, I_RESCAN, I_TRY, I_ARCS, I_WEDGE, I_QUIT, I_NONE };
 inline const char* tabName(int t) { static const char* const n[T_COUNT] = {"Controls", "Display", "Sound", "Card"}; return n[t]; }
 // A row's name, its chips ("A|B|C"; one label is an action button) and, for Controls, a line that says what it does.
 struct Info { const char* name; const char* chips; const char* hint; };
@@ -29,6 +29,7 @@ inline Info info(Item i) {
     case I_JUMP: return {"Jump button", "Corner|Near pad", "Near pad puts Space beside the pad: one thumb rocks between them."};
     case I_ARCS: return {"Jump arcs", "Off|On", "On: the upper corners of the pad walk and jump together. Off: they press the arrow and Up."};
     case I_WEDGE: return {"Jump wedge", "Narrow|Normal|Wide", "How wide the walk-and-jump slice is. Wide jumps sooner when you slide up."};
+    case I_QUIT: return {"Confirm Quit", "Off|On", "On: Quit to library in the pause menu needs a second tap."};
     case I_STYLUS: return {"Stylus latch", "Off|On", "A quick tap on the pad keeps walking until the next tap."};
     case I_STICKY: return {"Sticky direction", "Off|On", "Tap left or right to walk; tap again to stop."};
     case I_PALM: return {"Palm reject", "Off|Size|Near", "Ignore big touches (Size), or ones beside a held thumb (Near)."};
@@ -71,6 +72,7 @@ inline int value(Item i, const Values& v) {
     case I_JUMP: return v.s.jumpNear;
     case I_ARCS: return v.s.arcs;
     case I_WEDGE: return v.s.wedge;
+    case I_QUIT: return v.s.confirmQuit;
     case I_STYLUS: return v.s.stylus;
     case I_STICKY: return v.s.sticky;
     case I_PALM: return v.s.palm;
@@ -93,6 +95,7 @@ inline void choose(Item i, int k, Values& v) {
     case I_JUMP: v.s.jumpNear = b; break;
     case I_ARCS: v.s.arcs = b; break;
     case I_WEDGE: v.s.wedge = b; break;
+    case I_QUIT: v.s.confirmQuit = b; break;
     case I_STYLUS: v.s.stylus = b; break;
     case I_STICKY: v.s.sticky = b; break;
     case I_PALM: v.s.palm = b; break;
@@ -172,8 +175,8 @@ inline int tabItems(Tab t, Item* out) {
   int n = 0;
   switch (t) {
     case T_CONTROLS:
-      if (PREVIEW) { for (Item i : {I_HAND, I_PAD, I_DEAD, I_POS, I_JUMP, I_ARCS, I_WEDGE, I_STYLUS, I_STICKY, I_PALM}) out[n++] = i; }
-      else for (Item i : {I_HAND, I_PAD, I_POS, I_JUMP, I_DEAD, I_ARCS, I_WEDGE, I_STYLUS, I_STICKY, I_PALM}) out[n++] = i;
+      if (PREVIEW) { for (Item i : {I_HAND, I_PAD, I_DEAD, I_POS, I_JUMP, I_ARCS, I_WEDGE, I_STYLUS, I_STICKY, I_PALM, I_QUIT}) out[n++] = i; }
+      else for (Item i : {I_HAND, I_PAD, I_POS, I_JUMP, I_DEAD, I_ARCS, I_WEDGE, I_STYLUS, I_STICKY, I_PALM, I_QUIT}) out[n++] = i;
       if (scr::SMALL) out[n++] = I_CAL;
       out[n++] = I_TRY;
       break;
