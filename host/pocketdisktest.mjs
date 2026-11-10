@@ -73,4 +73,15 @@ assert.equal(fits(120000, 60000, 100000), false);
   await b.rescan();
   await b.close();
 }
+// the order list may hold up to 256 names; more is refused before anything is sent
+{
+  const sent = [];
+  const p = mockPort((t) => { sent.push(t); return t === 'DISK ORDER 256' ? 'DISK GO' : /^[A-Z0-9]+\.GMP$/.test(t) ? '' : hello(t); });
+  withPort(p);
+  const b = new Board();
+  await b.connect();
+  await assert.rejects(b.setOrder(Array.from({ length: 257 }, (_, i) => `G${i}.GMP`)), /at most 256/);
+  assert.ok(!sent.some((t) => t.startsWith('DISK ORDER')));
+  await b.close();
+}
 console.log('pocketdisktest ok');

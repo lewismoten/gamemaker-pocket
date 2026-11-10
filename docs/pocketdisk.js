@@ -17,6 +17,7 @@ export function crc32(bytes) {
 }
 const hex8 = (n) => n.toString(16).padStart(8, '0');
 export const BLOCK = 4096;
+export const ORDER_MAX = 256;  // the firmware's ORDER_MAX (src/serialfs.h)
 export const roundUp = (n) => Math.ceil(n / BLOCK) * BLOCK;
 // The same rule as the firmware's `fits`: two spare blocks stay free. A file it replaces is NOT credited: the old copy stays
 // until the new one is complete and renamed over it, so for a while both are on the board.
@@ -146,6 +147,7 @@ export class Board {
   }
   async remove(name) { this.lines.length = 0; await this.send(`DISK DEL ${name}`); await this.expect('DONE', 6000); }
   async setOrder(names) {
+    if (names.length > ORDER_MAX) throw new Error(`The board keeps an order of at most ${ORDER_MAX} games.`);
     this.lines.length = 0;
     await this.send(`DISK ORDER ${names.length}`);
     await this.expect('GO', 6000);
