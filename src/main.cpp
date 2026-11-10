@@ -30,6 +30,7 @@
 #include "statusled.h"
 #include "pressrect.h"
 #include "settingsdraw.h"
+#include "settingsguard.h"
 #include "firstrun.h"
 #include "picturetune.h"
 #include <mbedtls/sha256.h>
@@ -324,7 +325,7 @@ static void cacheGame(const GameEntry&g,File& f) {
   if(!cacheOut||cacheOut.size()>=4+MAXGAMES*sizeof(pk::Cached))return;pk::Cached row={};row.game=g;row.size=f.size();row.modified=f.getLastWrite();row.checksum=pk::crc32(&row,offsetof(pk::Cached,checksum));
   if(cacheOut.write((const uint8_t*)&row,sizeof row)!=sizeof row){cacheOut.close();SD.remove("/pocket/LIBRARY.NEW");}
 }
-static bool scanDone = false;
+static bool scanDone = false, scanOpenFailed = false;
 static uint32_t scanStart = 0, scanFiles = 0;
 static void stopCardScan() { scanDir.close(); cacheIn.close(); cacheOut.close(); unmountSD(); }
 static void releaseCatalog() { stopCardScan(); free(catalog); catalog = nullptr; games = nullptr; }
@@ -513,7 +514,7 @@ static void addBoardGames() {
 }
 static bool scanCardBatch() {
   if(scanDone||!haveSD||!catalog)return false;
-  if(!scanDir){if(!mountSD()){scanDone=true;cardState=pk::CARD_NONE;return true;}scanDir=SD.open("/pocket");if(!scanDir){scanDone=true;cardState=pk::CARD_NOFOLDER;stopCardScan();return true;}scanStart=millis();scanFiles=0;
+  if(!scanDir){if(!mountSD()){scanDone=true;cardState=pk::CARD_NONE;return true;}scanDir=SD.open("/pocket");if(!scanDir){scanDone=true;cardState=pk::CARD_NOFOLDER;stopCardScan();return true;}scanStart=millis();scanFiles=0;scanOpenFailed=false;
     cacheIn=SD.open("/pocket/LIBRARY.CCH","r");char magic[4];cacheValid=cacheIn&&cacheIn.size()>=4&&(cacheIn.size()-4)%sizeof(pk::Cached)==0&&cacheIn.size()<=4+MAXGAMES*sizeof(pk::Cached)&&cacheIn.read((uint8_t*)magic,4)==4&&!memcmp(magic,"PLC1",4);
     cacheOut=SD.open("/pocket/LIBRARY.NEW","w");if(cacheOut)cacheOut.write((const uint8_t*)"PLC1",4);
   }
@@ -523,7 +524,7 @@ static bool scanCardBatch() {
     const char*nm=strrchr(path.c_str(),'/');nm=nm?nm+1:path.c_str();size_t len=strlen(nm);
     if(dir||len<=4||len>=16||strcasecmp(nm+len-4,".gmp"))continue;
     bool safe=true;for(size_t i=0;i<len-4;i++)if(!pk::alnum(nm[i])&&nm[i]!='_'&&nm[i]!='-')safe=false;if(!safe)continue;
-    File f=SD.open(path.c_str(),"r");if(!f)continue;
+    File f=SD.open(path.c_str(),"r");if(!f){scanOpenFailed=true;continue;}
     GameEntry hit={};if(cachedGame(f,nm,hit)){cacheGame(hit,f);if(!duplicate(hit)){if(ngames==MAXGAMES){catalogOverflow=true;scanDone=true;}else games[ngames++]=hit;}f.close();if(scanDone)break;continue;}
     GameEntry g={};
     if(gmpEntry(f,nm,true,g)) {
@@ -531,7 +532,7 @@ static bool scanCardBatch() {
       if(!duplicate(g)){if(ngames==MAXGAMES){catalogOverflow=true;scanDone=true;}else games[ngames++]=g;}
     }f.close();if(scanDone)break;
   }
-  if(scanDone){cacheIn.close();if(cacheOut){cacheOut.close();SD.remove("/pocket/LIBRARY.CCH");SD.rename("/pocket/LIBRARY.NEW","/pocket/LIBRARY.CCH");}File dir=SD.open("/pocket");cardDirectoryStamp=dir?dir.getLastWrite():0;dir.close();cardScanKnown=true;if(cardState==pk::CARD_READING)cardState=pk::CARD_READY;Serial.printf("BOOT card-discovery ms=%lu entries=%lu games=%d\n",(unsigned long)(millis()-scanStart),(unsigned long)scanFiles,ngames);stopCardScan();}
+  if(scanDone){cacheIn.close();if(cacheOut){cacheOut.close();if(scanOpenFailed)SD.remove("/pocket/LIBRARY.NEW");  /* a game that would not open is missing from the new cache: keep the old one */else{SD.remove("/pocket/LIBRARY.CCH");SD.rename("/pocket/LIBRARY.NEW","/pocket/LIBRARY.CCH");}}File dir=SD.open("/pocket");cardDirectoryStamp=dir?dir.getLastWrite():0;dir.close();cardScanKnown=true;if(cardState==pk::CARD_READING)cardState=pk::CARD_READY;Serial.printf("BOOT card-discovery ms=%lu entries=%lu games=%d\n",(unsigned long)(millis()-scanStart),(unsigned long)scanFiles,ngames);stopCardScan();}
   return before!=ngames||scanDone;
 }
 // Rebuild released RAM from the disposable cache after play. A directory scan is only
@@ -688,6 +689,7 @@ static void ledWrite(uint32_t now) {
 // A 2-step tick: 1.2 kHz then 1.8 kHz, 3 steps of 1/145.6 s each (36 steps in a tune).
 static const uint8_t CLICK_TUNE[72] = {0xB0, 0x04, 0xB0, 0x04, 0xB0, 0x04, 0x08, 0x07, 0x08, 0x07, 0x08, 0x07};
 static void clickSound() { if (clicksOn) spk::play(CLICK_TUNE); }  // only the menus call it, never a game in play
+static bool keepSettingsFile = false;  // settings.txt exists but was not read whole: never replace it with defaults
 static void saveSettings() {
   Preferences pref;
   if (pref.begin("pocket", false)) {
@@ -696,6 +698,7 @@ static void saveSettings() {
     pref.putUChar("sound", settings.sound);  // also in NVS, so a reflash of the file system keeps the chosen volume
     pref.end();
   }
+  if (keepSettingsFile) return;
   File f = LittleFS.open("/settings.txt", "w");
   if (!f) return;
   // Older firmware reads these lines by their first letters ("pad" ...), so the newer keys share no prefix with the old ones and
@@ -714,8 +717,10 @@ static void loadSettings() {
     pref.end(); }
   // Sound: NVS first, then an older firmware's settings.txt line, else Off (the default, ctl::Settings).
   if (nvsSound >= 0 && nvsSound <= 3) settings.sound = (uint8_t)nvsSound;
+  keepSettingsFile = false;
+  bool existed = LittleFS.exists("/settings.txt");
   File f = LittleFS.open("/settings.txt", "r");
-  if (!f) return;
+  if (!f) { keepSettingsFile = pk::keepSettingsFile(existed, false, 0, 0); return; }
   while (f.available()) {
     String l = f.readStringUntil('\n');
     int eq = l.indexOf('=');
@@ -735,6 +740,7 @@ static void loadSettings() {
     else if (k == "arcs") settings.arcs = v ? 1 : 0;
     else if (k == "wedge") settings.wedge = v < 0 ? 0 : v > 2 ? 2 : v;
   }
+  keepSettingsFile = pk::keepSettingsFile(existed, true, (long)f.position(), (long)f.size());
 }
 
 // ---- touch input -------------------------------------------------------------------------------
