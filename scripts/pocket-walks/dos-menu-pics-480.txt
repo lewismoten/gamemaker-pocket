@@ -1,0 +1,22 @@
+# Game menu picture, See Credits (card c) and See Highest Scores (card b) on a game packed with those slots (480 px board). Needs an SD card with Teddy's pack (index 14 in the list) from pocketData.ts --gmp.
+send D 14
+tap 360 290
+wait 2500
+tap 100 100
+wait 3500
+tap 180 222
+wait 3000
+tap 100 100
+wait 2000
+tap 100 100
+wait 2000
+tap 100 100
+wait 2000
+tap 100 100
+wait 2000
+tap 100 100
+wait 2000
+tap 100 100
+tap 180 234
+wait 1500
+tap 100 100

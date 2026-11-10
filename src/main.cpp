@@ -1329,7 +1329,7 @@ static void playFli(const gm::Card& c) {
   size_t tn = 0;
   uint8_t* table = gm::readCard(assets, readPak, c.file, &tn);
   uint8_t* buf = (uint8_t*)calloc(gm::PIC_BYTES, 1);  // 768 palette bytes, then the canvas
-  if (!table || !buf) { free(table); free(buf); cardsFailed++; return; }
+  if (!table || !buf) { Serial.printf("FLI no %s (%s) heap %u block %u\n", table ? "canvas" : "table", c.file, (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)); free(table); free(buf); cardsFailed++; return; }
   setPalette6(buf);
   carddraw::clear(tft, pal[0]);
   uint32_t due = millis();
@@ -1339,7 +1339,7 @@ static void playFli(const gm::Card& c) {
   for (int i = 0; i < c.more && !tapped; i++) {
     size_t n = 0;
     uint8_t* d = gm::fliFrameData(assets, readPak, table, tn, i, &n);
-    if (!d) { cardsFailed++; break; }
+    if (!d) { Serial.printf("FLI frame %d of %s unreadable, heap %u block %u\n", i, c.file, (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)); cardsFailed++; break; }
     if (gm::fliApply(d, n, buf + 768, buf)) setPalette6(buf);
     free(d);
     pushPicture(buf + 768);
@@ -1389,7 +1389,9 @@ static void showCards(const char* where) {
     } else if (c.kind == 'f' && where[0] == 'c' && !where[1]) {  // an animated credits page: its frames with the pack's pause after the last
       free(pic);
       pic = nullptr;
+      int failedBefore = cardsFailed;
       playFli(c);
+      cardsFailed = failedBefore;  // a frame that doesn't fit the heap is left out quietly (the next credits cards still show)
     } else if (c.kind == 't' && pic) {
       if (!fontData) { size_t fn = 0; fontData = readFileIn(LittleFS, "", "font.bin", &fn); if (fontData && fn < 95 * 8) { free(fontData); fontData = nullptr; } }
       size_t tn = 0;
@@ -1943,6 +1945,10 @@ static bool dosMenu(int g, bool intro) {
   assets.release();
   bool card = curFs == &SD;
   if (card) mountSD();
+  {
+    gm::Card pc[1];
+    Serial.printf("PACK %s menu %d credits %d scores %d\n", assets.cfgName, gm::cardsOfFile(cfgLines, assets.cfgName, "m", pc, 1), gm::cardsOfFile(cfgLines, assets.cfgName, "c", pc, 1), gm::cardsOfFile(cfgLines, assets.cfgName, "b", pc, 1));
+  }
   uint8_t black[768];
   memset(black, 0, sizeof black);
   if (intro && (mask & 1)) { tft.fillScreen(C_BLACK); showCards("t"); }
@@ -2010,7 +2016,13 @@ static bool dosMenu(int g, bool intro) {
       }
     } else if (act == gmmenu::M_CREDITS) {  // the credits (slot 7, `card c`, SD packs only): PLAYGAME's own line for a game without one
       gm::Card cc[1];
-      if (gm::cardsOfFile(cfgLines, assets.cfgName, "c", cc, 1) > 0) { tft.fillScreen(C_BLACK); readingPages = true; showCards("c"); readingPages = false; continue; }
+      if (gm::cardsOfFile(cfgLines, assets.cfgName, "c", cc, 1) > 0) {
+        int shown = cardsShown;
+        Serial.println("SCREEN credits");
+        tft.fillScreen(C_BLACK); readingPages = true; showCards("c"); readingPages = false;
+        Serial.printf("CREDITS pages %d failed %d\n", cardsShown - shown, cardsFailed);
+        continue;
+      }
       uint8_t* p2 = menuBackground();
       if (p2) {
         setPalette6(p2);

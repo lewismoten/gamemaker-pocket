@@ -135,4 +135,4 @@ outlines every touch rectangle (a color per action) at 2x. Build it against two 
 
 ## Saved games, Top Ten, game menu
 
-`gamesavetest.cpp` round-trips a save (src/gmsave.h), inserts into the Top Ten (src/gmhiscore.h) and checks the menu's touch map (src/gmmenu.h); `dosmenushots.cpp <data dir> <out dir>` renders the menu, Top Ten and name entry. Build each with `c++ -std=c++17 -O1 -Isrc host/<file>.cpp -lz` (add `-DPOCKET_CYD28` for 320 x 240).
+`gamesavetest.cpp` round-trips a save (src/gmsave.h), inserts into the Top Ten (src/gmhiscore.h) and checks the menu's touch map (src/gmmenu.h); `dosmenushots.cpp <data dir> <out dir> ["<title>" <pack base>]` renders the menu, Top Ten and name entry (with a card pack's base, such as `<card>/pocket/b65840cg` from `pocketData.ts --out`, also the game's own menu picture, credits pictures and Top Ten backdrop). Build each with `c++ -std=c++17 -O1 -Isrc host/<file>.cpp -lz` (add `-DPOCKET_CYD28` for 320 x 240).
