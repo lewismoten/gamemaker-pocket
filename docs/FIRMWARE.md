@@ -12,6 +12,32 @@ Card drawing (`src/carddraw.h`) clears the full panel to palette 0 between scene
 
 Files: `src/gmcore.h` (play loop), `src/gmcards.h` (the pictures and text pages between levels, no board code), `src/gmmon.h` (monsters), `src/gmcfg.h` (a game's `.cfg` and the level file loader), `src/library.h` (bounded optional metadata and compact catalog/cache records), `src/picker_draw.h` (six-slot geometry and rendering), `src/favorites.h` (Recently played and Favorites lists and their NVS form), `src/controls.h` (touch controls model), `src/pcspeaker.h` (the PC speaker tune player, no board code), `src/speaker.h` (GPIO 26 and the task that drives it), `src/gt911.h` (touch chip, up to 5 fingers with ids and sizes), `src/gt911report.h` (I²C reports, host-tested for interrupted reads), `src/picker.h` (bounded titles and search), `src/picker_draw.h` (rows, icons and keyboard shared with host renders), `src/screen.h` (play viewport), `src/main.cpp` (files, panel, screens, drawing), `src/btnicon.h` (which picture a key's button shows: the shot or item it throws or uses), `host/hosttest.cpp`, `host/controlstest.cpp`, `host/cardstest.cpp` (Mac tests) and `host/iconsdump.cpp` (lists the picture each button gets; `web/scripts/pocketIconsShot.py` draws them). The controls are drawn into each band of the picture before it is pushed once (`drawControls` in `main.cpp`), so they never blink; a button shows its key's name big and under it the picture or the game's label, wrapped to two lines, shrunk, then cut with "...".
 
+## UI pack usability (November 10, 2026)
+
+Details leads with a wrapped 2x game title, collection/storage source and the existing
+touch advisory, followed by the game's Title/Story/Instructions pages and Back,
+Favorite and a yellow Play button. The footer targets are 44 px tall. Library header
+targets now match the drawing at 40/44 px tall; paging targets are 38/44 px tall.
+The six tiles retain their hit areas in shared geometry, with room for a Collections
+or Games label. Small-board collection names use integer-rendered 1.5x glyphs.
+Selected games have both a thick frame and a SELECTED chip.
+
+Empty search/category/Favorites states explain what to do next. The empty library's
+44 px Check card button is now registered with the release-based press handler;
+card errors and missing `/pocket` folders retain their individual recovery messages.
+Settings uses the pack's navy panels and yellow selected tabs/chips, with card status
+first and a PC speaker note. Every option, paused-game Rescan restriction and the
+2.8-inch Controls Preview page remains available. No new bitmap assets or persistent
+settings were added.
+
+Both PlatformIO environments build. Comparing the original branch source with the
+same firmware ID/date: `cyd-2432s028` app flash 609769 -> 610913 bytes (+1144),
+`esp32-3248s035` 609349 -> 610605 bytes (+1256). Static RAM is unchanged at 121440
+and 111832 bytes respectively. All local host recipes pass, including the 106-game
+onboard probes/profile; external card exports and engine parity walkthroughs are
+outside this run. `host/extrastest.cpp` and `host/settingstest.cpp` render the shared
+screen code and check press geometry; see [host recipes](../host/README.md#ui-pack-usability-renders).
+
 ## Display and input updates (November 6, 2026)
 
 The Phase 1 row picker has been replaced by the [library browser](#library-browser-library-metadata-version-1).

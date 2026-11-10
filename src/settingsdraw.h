@@ -14,7 +14,7 @@
 #include "paddraw.h"
 #include "screen.h"
 namespace st {
-constexpr uint16_t C_WHITE = 0xFFFF, C_BLACK = 0, C_YELLOW = 0xFF2A, C_GRAY = 0x7BEF, C_DARK = 0x2104, C_BLUE = 0x3A9C, C_VIEW = 0x10A6;
+constexpr uint16_t C_WHITE = 0xFFFF, C_BLACK = 0x10A5, C_YELLOW = 0xFEAA, C_GRAY = 0xA5B9, C_DARK = 0x1927, C_BLUE = 0x7DDF, C_VIEW = 0x10A6;
 enum Tab : uint8_t { T_CONTROLS, T_DISPLAY, T_SOUND, T_CARD, T_COUNT };
 enum Item : uint8_t { I_HAND, I_PAD, I_DEAD, I_POS, I_JUMP, I_STYLUS, I_STICKY, I_PALM, I_CAL, I_BRIGHT, I_SMALLER, I_DEBUG, I_LED, I_PANEL, I_SOUND, I_CLICKS, I_RESCAN, I_TRY, I_ARCS, I_WEDGE, I_NONE };
 inline const char* tabName(int t) { static const char* const n[T_COUNT] = {"Controls", "Display", "Sound", "Card"}; return n[t]; }
@@ -271,6 +271,7 @@ template <class G_> void text(G_& g, int x, int y, const char* s, float size, ui
 // Words wrapped into `cols` columns, from (x, y), at most `rows` lines.
 template <class G_> void wrapped(G_& g, int x, int y, const char* s, int cols, int rows, float size, uint16_t fg) {
   char line[64];
+  if (cols > 63) cols = 63;
   int lh = (int)(8 * size) + 3;
   while (*s && rows-- > 0) {
     int n = (int)strlen(s), take = n;
@@ -287,16 +288,21 @@ inline float fitSize(const char* s, int w, float size) {
   while (size > 1.0f && (int)(strlen(s) * 6 * size) > w - 6) size -= 0.5f;
   return size;
 }
+template <class G_> void button(G_& g,int x0,int y0,int x1,int y1,const char* label,bool selected,uint16_t backing,float size) {
+  g.fillRect(x0,y0,x1-x0,y1-y0,selected?C_YELLOW:backing);
+  g.drawRect(x0,y0,x1-x0,y1-y0,selected?C_YELLOW:0x324C);
+  text(g,(x0+x1-(int)(strlen(label)*6*size))/2,(y0+y1-(int)(8*size))/2,label,size,selected?C_BLACK:C_WHITE,selected?C_YELLOW:backing);
+}
 template <class G_> void bar(G_& g, const View& v) {
-  g.fillRect(0, 0, W, G.barH, C_BLACK);
+  g.fillRect(0, 0, W, G.barH, 0x0863);
   Box b = backBox();
-  ovl::button(g, b.x0, b.y0, b.x1, b.y1, "Back", false, C_DARK, G.tabSize);
+  button(g, b.x0, b.y0, b.x1, b.y1, "Back", false, C_DARK, G.tabSize);
   for (int t = 0; t < T_COUNT; t++) {
     Box tb = tabBox(t);
     bool on = t == v.tab;
-    ovl::button(g, tb.x0, tb.y0, tb.x1, tb.y1, tabName(t), false, on ? C_BLUE : C_DARK, G.tabSize);
+    button(g, tb.x0, tb.y0, tb.x1, tb.y1, tabName(t), on, C_DARK, G.tabSize);
   }
-  g.fillRect(0, G.barH - 2, W, 2, C_BLUE);
+  g.fillRect(0, G.barH - 2, W, 2, 0x324C);
 }
 template <class G_> void row(G_& g, Tab t, int k, Item it, const Values& vals, bool disabled) {
   RowBox r = rowBox(t, k);
@@ -315,7 +321,7 @@ template <class G_> void row(G_& g, Tab t, int k, Item it, const Values& vals, b
       g.setTextDatum(textdatum_t::middle_center);
       g.drawString(lab, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2);
       g.setTextDatum(textdatum_t::top_left);
-    } else ovl::button(g, b.x0, b.y0, b.x1, b.y1, lab, j == sel, C_DARK, sz);
+    } else button(g, b.x0, b.y0, b.x1, b.y1, lab, j == sel, C_DARK, sz);
   }
 }
 // Names of the keys held now (bits: 1 left, 2 right, 4 up, 8 down, 16 Space (shown as Jump), 32 Enter).
@@ -369,7 +375,7 @@ template <class G_> void preview(G_& g, const ctl::Layout& L, const ctl::Need& n
   if (nd.space) disc(L.space, btn & 1, "Jump", "J");
   if (nd.enter) disc(L.enter, btn & 2, "Enter", "E");
   int mx0 = p.x0 + sc(L.menu.x0), my0 = p.y0 + sc(L.menu.y0), mx1 = p.x0 + sc(L.menu.x1), my1 = p.y0 + sc(L.menu.y1);
-  ovl::button(g, mx0, my0, mx1, my1, (mx1 - mx0) >= 28 ? "MENU" : "M", btn & 4, C_DARK, 1);
+  button(g, mx0, my0, mx1, my1, (mx1 - mx0) >= 28 ? "MENU" : "M", btn & 4, C_DARK, 1);
 }
 // The line under the preview: what the finger presses, else what the last row changed, else how to use it.
 template <class G_> void previewNote(G_& g, const View& v, uint8_t held) {
@@ -390,15 +396,15 @@ template <class G_> void previewNote(G_& g, const View& v, uint8_t held) {
   }
 }
 template <class G_> void cardLines(G_& g, const CardInfo& c) {
-  int y = G.y0 + 4, step = scr::SMALL ? 20 : 30;
+  int y = G.y0 + 4, step = scr::SMALL ? 18 : 28;
   float sz = scr::SMALL ? 1.0f : 1.5f;
   char t[48];
+  if (c.state[0]) { text(g, 12, y, c.state, 2, C_YELLOW, C_BLACK); y += scr::SMALL?28:36; }
   snprintf(t, sizeof t, c.builtIn == 1 ? "Built in: %d game" : "Built in: %d games", c.builtIn);
-  text(g, 6, y, t, sz, C_WHITE, C_BLACK); y += step;
-  if (c.state[0]) { text(g, 6, y, c.state, sz, C_WHITE, C_BLACK); y += step; }
-  if (c.space[0]) { text(g, 6, y, c.space, sz, C_WHITE, C_BLACK); y += step; }
-  if (c.flash[0]) { text(g, 6, y, c.flash, sz, C_GRAY, C_BLACK); y += step; }
-  if (c.board[0]) { text(g, 6, y, c.board, sz, C_GRAY, C_BLACK); y += step; }
+  text(g, 12, y, t, sz, C_WHITE, C_BLACK); y += step;
+  if (c.space[0]) { text(g, 12, y, c.space, sz, C_WHITE, C_BLACK); y += step; }
+  if (c.flash[0]) { text(g, 12, y, c.flash, sz, C_GRAY, C_BLACK); y += step; }
+  if (c.board[0]) { text(g, 12, y, c.board, sz, C_GRAY, C_BLACK); }
   if (c.fromPause) text(g, 6, G.cardRowY + G.lineChipH + 8, "Rescan from the game list (a game is paused).", 1, C_GRAY, C_BLACK);
 }
 // The whole screen. `L`, `nd`, `dirs`, `btn` and `held` are the preview's (Controls only).
@@ -410,6 +416,12 @@ template <class G_> void screen(G_& g, const View& v, const Values& vals, const 
   int n = pageItems(v, it);
   for (int k = 0; k < n; k++) row(g, v.tab, k, it[k], vals, it[k] == I_RESCAN && v.fromPause);
   if (v.tab == T_CARD) cardLines(g, card);
+  if (v.tab == T_SOUND) {
+    int y=G.y0+2*G.lineStep+12;
+    text(g,12,y,"PC SPEAKER",2,C_BLUE,C_BLACK);
+    float hintSize=scr::SMALL?1.0f:1.5f;
+    wrapped(g,12,y+26,"Volume changes play a sample. Button clicks are saved separately.",(int)((W-24)/(6*hintSize)),3,hintSize,C_GRAY);
+  }
   if (v.tab == T_CONTROLS) {
     if (showsPreview(v)) {
       preview(g, L, nd, dirs, btn, vals.s.floatPad && !held && !dirs ? ctl::LOOK_OFF : ctl::LOOK_FULL);
@@ -417,16 +429,16 @@ template <class G_> void screen(G_& g, const View& v, const Values& vals, const 
     }
     if (!PREVIEW && v.preview) {
       Box o = optionsBtn();
-      ovl::button(g, o.x0, o.y0, o.x1, o.y1, "Back to options", false, C_DARK, 1);
+      button(g, o.x0, o.y0, o.x1, o.y1, "Back to options", false, C_DARK, 1);
     } else if (!PREVIEW) {
       Box o = previewBtn();
-      ovl::button(g, o.x0, o.y0, o.x1, o.y1, "Preview", false, C_DARK, 1);
+      button(g, o.x0, o.y0, o.x1, o.y1, "Preview", false, C_DARK, 1);
     }
     if (pages(v.tab) > 1 && !(v.preview && !PREVIEW)) {
       Box m = moreBox();
       char t[16];
       snprintf(t, sizeof t, "More %d/%d", v.page + 1, pages(v.tab));
-      ovl::button(g, m.x0, m.y0, m.x1, m.y1, t, false, C_DARK, PREVIEW ? 2 : 1);
+      button(g, m.x0, m.y0, m.x1, m.y1, t, false, C_DARK, PREVIEW ? 2 : 1);
     }
   }
 }

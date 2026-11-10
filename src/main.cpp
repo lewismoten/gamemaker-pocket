@@ -1106,12 +1106,15 @@ static void drawPicker(bool clear = true, bool paging = false) {
     else {int i=catalog->matches[at];pk::Meta m;gameMeta(games[i],m);uint8_t*raw=preview(games[i]);bool starter=games[i].category==1;pk::thumbnail(tft,scr::W,r,raw,m.title[0]?m.title:m.dos,i==selected,true,catalog->pins.has(games[i].uid),starter?m.title:nullptr,starter?m.course:0,games[i].scored&&games[i].score>=85,pk::onBoard(games[i]));free(raw);}
   }
   if(!was)unmountSD();
-  if(!count&&searchText[0])pk::drawSmallIcon(tft,17,16,68,true);
+
   if(none&&pk::drawEmptyNotice(tft,scr::W,cardState,cardGames())){}
   else if(!count&&category==pk::CAT_FAVORITES&&!searchText[0])pk::emptyFavorites(tft,scr::W,catalog->pins.n>0);
-  else if(!count){tft.setTextColor(C_WHITE,C_BLACK);tft.setTextSize(1);tft.setCursor(16,90);tft.print(searchText[0]?"No matching titles":"No games found");}
-  if(uidConflict){tft.setTextColor(C_YELLOW,C_BLACK);tft.setTextSize(1);tft.setCursor(4,188);tft.print("UID conflict: first copy kept");}
-  if(catalogOverflow){tft.setTextColor(C_YELLOW,C_BLACK);tft.setTextSize(1);tft.setCursor(4,198);tft.print("Library limit: 512 games / 24 collections");}
+  else if(!count)pk::emptyResults(tft,scr::W,searchText[0]);
+  if(uidConflict||catalogOverflow){
+    tft.fillRect(0,pk::header(scr::W),scr::W,12,pk::C_BLACK);
+    tft.setTextColor(pk::C_YELLOW,pk::C_BLACK);tft.setTextSize(1);tft.setCursor(4,pk::header(scr::W)+2);
+    tft.print(catalogOverflow?(uidConflict?"512 games / 24 collections; UID conflict":"Library limit: 512 games / 24 collections"):"UID conflict: first copy kept");
+  }
   Serial.printf("LIB page ms=%lu catalog=%u free=%u largest=%u\n",(unsigned long)(millis()-t),(unsigned)sizeof(pk::Catalog),(unsigned)ESP.getFreeHeap(),(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
 static void drawSearch() {
@@ -1122,18 +1125,11 @@ static void drawSearch() {
 }
 static int detailsMask = 0;  // the selected game's own pages (picker.h detailsPageSpan), read from its .cfg when Details opens
 static void drawDetails() {
-  tft.fillScreen(C_BLACK);title("Game details");
   pk::Meta m;gameMeta(games[selected],m);
-  pk::Tile clip={8,40,scr::W-16,pk::detailsPagesTop(scr::H)-44,0,0};
-  size_t at=0,n=strlen(m.title);int y=44,cols=(scr::W-16)/6;
-  while(at<n){char b[81];size_t take=n-at<(size_t)cols?n-at:cols;memcpy(b,m.title+at,take);b[take]=0;pk::clippedText(tft,clip,b,8,y,1,C_WHITE);at+=take;y+=12;}
-  if(games[selected].scored){  // a suggestion in plain words, never a verdict (the score is advisory)
-    const char*t=games[selected].score>=85?"Plays well on touch":games[selected].score<60&&games[selected].quick?"Needs quick, exact jumps":nullptr;
-    if(t&&y+18<=pk::detailsPagesTop(scr::H))pk::detailsTouch(tft,scr::W,y+2,t);
-  }
-  bool pinned=catalog&&catalog->pins.has(games[selected].uid);
-  pk::detailsPages(tft,scr::W,scr::H,detailsMask);
-  pk::detailsFooter(tft,scr::W,scr::H,pinned);if(pinned)pk::detailsNote(tft,scr::W,scr::H,"In Favorites");
+  const auto& game=games[selected];
+  const char* advisory=game.scored?(game.score>=85?"Plays well on touch":game.score<60&&game.quick?"Needs quick, exact jumps":nullptr):nullptr;
+  char source[64];snprintf(source,sizeof source,"%s  /  %s",rootLabel(game.category),game.sd?"microSD":pk::onBoard(game)?"On board":"Built-in Starter");
+  pk::detailsScreen(tft,scr::W,scr::H,m.title[0]?m.title:m.dos,source,advisory,detailsMask,catalog&&catalog->pins.has(game.uid));
 }
 // A short rising beep to hear the volume with (36 steps of 1/145.6 s, little endian frequencies in Hz).
 static const uint8_t SAMPLE_TUNE[72] = {
@@ -2376,6 +2372,7 @@ static prs::Ctx ctxFor(prs::Screen sc) {
   c.titleH = TITLE_H;
   if (sc == prs::SC_PICKER) {
     int count = browsingCategories ? categoryCount : nmatch, pages = (count + 5) / 6;
+    c.emptyCheck = browsingCategories && !category && !searchText[0] && !ngames && cardState!=pk::CARD_READING;
     c.back = !(browsingCategories && !category && !searchText[0]);
     c.prev = page > 0;
     c.next = page + 1 < pages;
@@ -2534,7 +2531,7 @@ void loop() {
 #endif
     if (menuTap(prs::SC_PICKER, tx, ty)) {
       int count=browsingCategories?categoryCount:nmatch,pages=(count+5)/6;
-      if(ty<36) {
+      if(ty<pk::header(scr::W)) {
         if(pk::hitSettings(scr::W,tx)){stopCardScan();openSettings(false);}
         else if(pk::hitSearch(scr::W,tx)){stopCardScan();strcpy(savedSearch,searchText);savedAll=searchAll;savedBrowsing=browsingCategories;mode=SEARCH_SCREEN;drawSearch();}
         else if(pk::hitBack(scr::W,tx)&&!(browsingCategories&&!category&&!searchText[0])){  // the root page has no back arrow

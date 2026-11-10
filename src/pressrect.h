@@ -17,6 +17,7 @@ enum Screen : uint8_t { SC_PICKER, SC_DETAILS, SC_DISPLAY, SC_SETTINGS, SC_PAUSE
 struct Ctx {
   Screen screen = SC_PICKER;
   int W = 480, H = 320, titleH = 40;
+  bool emptyCheck = false;
   bool back = true, prev = false, next = false, action = false;  // library: which controls are live
   int tiles = 0;                                                // library: tiles on this page
   st::View settings;     // settings: the tab and page showing
@@ -24,31 +25,27 @@ struct Ctx {
   int pages = 0;        // details: the game's own pages (picker.h detailsPageSpan mask)
 };
 inline Rect tileRect(int W, int i) {
-  bool s = W == 320;
-  Rect r;
-  r.x0 = (s ? 12 : 16) + i % 3 * (s ? 100 : 152);
-  r.y0 = (s ? 36 : 40) + i / 3 * (s ? 84 : 120);
-  r.x1 = r.x0 + (s ? 96 : 144);
-  r.y1 = r.y0 + (s ? 80 : 112);
-  return r;
+  auto t=pk::tile(W,i);
+  return {t.x,t.y,t.x+t.w,t.y+t.h};
 }
 // The button under (x, y), or false. Only live controls count.
 inline bool under(const Ctx& c, int x, int y, Rect& r) {
   const int W = c.W, H = c.H;
   switch (c.screen) {
     case SC_PICKER: {
-      int f = W == 320 ? 208 : 280;
-      if (y < 32) {
-        if (x >= W - 32) r = {W - 32, 0, W, 32};
-        else if (x >= W - 64) r = {W - 64, 0, W - 32, 32};
-        else if (x < 32 && c.back) r = {0, 0, 32, 32};
+      int f = pk::footer(W);
+      if (y < pk::header(W)) {
+        if (x >= W - 40) r = {W - 40, 0, W, pk::header(W)};
+        else if (x >= W - 80) r = {W - 80, 0, W - 40, pk::header(W)};
+        else if (x < 40 && c.back) r = {0, 0, 40, pk::header(W)};
         else return false;
       } else if (y >= f) {
-        if (x < 48 && c.prev) r = {0, f, 48, H};
-        else if (x >= 50 && x < 98 && c.next) r = {50, f, 98, H};
+        if (x < 56 && c.prev) r = {0, f, 56, H};
+        else if (x >= 58 && x < 114 && c.next) r = {58, f, 114, H};
         else if (x >= W - 100 && c.action) r = {W - 100, f, W, H};
         else return false;
       } else {
+        if(c.emptyCheck) { int y1=pk::footer(W)-4; r={12,y1-44,W-12,y1};return r.has(x,y); }
         for (int i = 0; i < c.tiles; i++) {
           r = tileRect(W, i);
           if (r.has(x, y)) return true;
@@ -64,8 +61,8 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
         return true;
       }
     }
-      if (y < H - 38) return false;
-      r = x < W / 3 ? Rect{0, H - 38, W / 3 - 2, H} : x < 2 * W / 3 ? Rect{W / 3, H - 38, 2 * W / 3 - 2, H} : Rect{2 * W / 3, H - 38, W, H};
+      if (y < pk::detailsFooterTop(H)) return false;
+      r = x < W / 3 ? Rect{0, pk::detailsFooterTop(H), W / 3 - 2, H} : x < 2 * W / 3 ? Rect{W / 3, pk::detailsFooterTop(H), 2 * W / 3 - 2, H} : Rect{2 * W / 3, pk::detailsFooterTop(H), W, H};
       return r.has(x, y);
     case SC_DISPLAY:
       if (y >= H - 38) r = {6, H - 38, 100, H - 2};

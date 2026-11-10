@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "picker.h"
 namespace pk {
-constexpr uint16_t C_WHITE = 0xFFFF, C_BLACK = 0, C_YELLOW = 0xFF2A, C_GRAY = 0x7BEF, C_DARK = 0x2104;
+constexpr uint16_t C_WHITE = 0xFFFF, C_BLACK = 0x10A5, C_YELLOW = 0xFEAA, C_GRAY = 0xA5B9, C_DARK = 0x1927;
 // on=false draws it gray: a button that would do nothing now (the first page's back arrow, Details with no game picked).
 template <class G> void drawButton(G& g, int x0, int y0, int x1, int y1, const char* label, bool on = true) {
   g.fillRoundRect(x0, y0, x1 - x0, y1 - y0, 6, C_DARK);
@@ -68,6 +68,7 @@ template <class G> void drawSearchText(G& tft, int titleH, const char* text, con
   tft.fillRect(8 + strlen(shown) * 12, titleH + 4, 2, 16, C_WHITE);
 }
 template <class G> void drawKeyboard(G& tft, int W, int H, int titleH, const char* text) {
+  tft.fillRect(0,0,W,H,C_BLACK);
   drawSearchText(tft, titleH, text);
   const char* keys = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   int top = titleH + 26, step = (H - top - 38) / 4;
@@ -84,9 +85,6 @@ template <class G> void drawKeyboard(G& tft, int W, int H, int titleH, const cha
 #include "icons_data.h"
 #include "favorites.h"
 namespace pk {
-struct Tile { int x,y,w,h,pw,ph; };
-inline Tile tile(int W,int i) { bool s=W==320;return {(s?12:16)+i%3*(s?100:152),(s?36:40)+i/3*(s?84:120),s?96:144,s?80:112,s?96:144,s?60:90}; }
-inline int footer(int W) {return W==320?202:276;}  // the page buttons are 38 px (320) or 44 px (480) tall
 inline int hitTile(int W,int x,int y) {for(int i=0;i<6;i++){auto r=tile(W,i);if(x>=r.x&&x<r.x+r.w&&y>=r.y&&y<r.y+r.h)return i;}return -1;}
 template<class G> void clippedText(G&g,const Tile&r,const char*s,int x,int y,int scale,uint16_t color) {
   for(;*s;s++,x+=6*scale)for(int yy=0;yy<8;yy++)for(int xx=0;xx<6;xx++)if(((unsigned char)*s>=32&&(unsigned char)*s<=126&&(SOFT_FONT[(unsigned char)*s-32][yy]&(1<<xx))))
@@ -108,8 +106,8 @@ template<class G> void drawSmallIcon(G&g,int icon,int x,int y,bool panelOrder=fa
   for(int sy=0;sy<16;sy++){for(int sx=0;sx<16;sx++){uint8_t v=ICONS[icon][sy*16+sx];uint16_t c=v?ICON_PALETTE[v]:C_DARK;if(panelOrder)c=(c<<8)|(c>>8);row[sx]=c;}g.pushImage(x,y+sy,16,1,row);}
 }
 // A label broken at spaces into up to four lines that fit a tile.
-inline int labelLines(const Tile&r,const char*label,int scale,char lines[4][25]) {
-  int cols=(r.w-8)/(6*scale),count=0;if(cols>24)cols=24;size_t at=0,len=strlen(label);
+inline int labelLines(const Tile&r,const char*label,int units,char lines[4][25]) {
+  int cols=(r.w-8)/(3*units),count=0;if(cols>24)cols=24;size_t at=0,len=strlen(label);
   while(count<4&&at<len) {size_t n=len-at<(size_t)cols?len-at:cols;
     if(at+n<len){size_t word=n;while(word&&label[at+word]!=' ')word--;if(word)n=word;}
     memcpy(lines[count],label+at,n);lines[count][n]=0;count++;at+=n;while(label[at]==' ')at++;
@@ -119,18 +117,26 @@ inline int labelLines(const Tile&r,const char*label,int scale,char lines[4][25])
 // icon < 0: the name alone. The icon is dropped when the name needs its room.
 template<class G> void tileLabel(G&g,int W,int i,const char*label,bool selected=false,int icon=-1,bool panelOrder=false) {
   auto r=tile(W,i);g.fillRect(r.x,r.y,r.w,r.h,C_DARK);g.drawRect(r.x,r.y,r.w,r.h,selected?C_YELLOW:C_GRAY);if(selected)selFrame(g,r);
-  int scale=W==320?1:2;char lines[4][25];int count=labelLines(r,label,scale,lines);
-  int text=count*10*scale,icons=icon>=0&&icon<ICON_COUNT&&text+36<=r.h-4?36:0;
+  int units=W==320?3:4;char lines[4][25];int count=labelLines(r,label,units,lines);
+  int text=count*5*units,icons=icon>=0&&icon<ICON_COUNT&&text+36<=r.h-4?36:0;
   int y=r.y+(r.h-text-icons)/2;
   if(icons){drawTileIcon(g,icon,r.x+r.w/2,y,panelOrder);y+=icons;}
-  for(int line=0;line<count;line++,y+=10*scale)clippedText(g,r,lines[line],r.x+(r.w-(int)strlen(lines[line])*6*scale)/2,y,scale,C_WHITE);
+  // 1.5x on the small board keeps whole words such as Favorites readable in a 96 px tile.
+  // Integer pixel edges work through SoftGfx too (its built-in text sizes are whole numbers).
+  for(int line=0;line<count;line++,y+=5*units) {
+    int x=r.x+(r.w-(int)strlen(lines[line])*3*units)/2;
+    for(const char* s=lines[line];*s;s++,x+=3*units)
+      for(int yy=0;yy<8;yy++)for(int xx=0;xx<6;xx++)
+        if((unsigned char)*s>=32&&(unsigned char)*s<=126&&(SOFT_FONT[(unsigned char)*s-32][yy]&(1<<xx)))
+          g.fillRect(x+xx*units/2,y+yy*units/2,(xx+1)*units/2-xx*units/2,(yy+1)*units/2-yy*units/2,C_WHITE);
+  }
 }
 // A name centered in a tile, in up to four lines broken at spaces (a game with no title picture shows its title this way).
 template<class G> void tileName(G&g,const Tile&r,const char*name,int scale) {
-  char lines[4][25];int count=labelLines(r,name,scale,lines),y=r.y+(r.h-count*10*scale)/2;
+  char lines[4][25];int count=labelLines(r,name,scale*2,lines),y=r.y+(r.h-count*10*scale)/2;
   for(int line=0;line<count;line++,y+=10*scale)clippedText(g,r,lines[line],r.x+(r.w-(int)strlen(lines[line])*6*scale)/2,y,scale,C_WHITE);
 }
-template<class G> void clearTiles(G&g,int W) {g.fillRect(0,32,W,footer(W)-32,C_BLACK);}
+template<class G> void clearTiles(G&g,int W) {g.fillRect(0,0,W,footer(W),C_BLACK);}
 // The Good on touch icon (16 = ICONS index) at 1x, no backing, with a dark outline so it reads over any picture: the mark of a game
 // that scores 85 or more on the touch advisory. Bottom right of its tile, clear of the title art (the favorite's star is top right).
 template<class G> void touchMark(G&g,int x,int y,bool panelOrder=false) {
@@ -176,6 +182,7 @@ template<class G> void thumbnail(G&g,int W,int i,const uint8_t*raw,const char*do
   }if(caption)tileCaption(g,r,y0+shown+(r.w>=144?2:3),caption,course);
   }else tileName(g,r,dos,1);  // no title picture: the name main.cpp gives (the title, else the DOS name), wrapped; a picture is shown whole
   g.drawRect(r.x,r.y,r.w,r.h,selected?C_YELLOW:C_GRAY);if(selected)selFrame(g,r);
+  if(selected){g.fillRect(r.x+4,r.y+4,52,12,C_YELLOW);clippedText(g,r,"SELECTED",r.x+6,r.y+6,1,C_BLACK);}
   if(pinned)starMark(g,W,i);
   if(touch)touchMark(g,r.x+r.w-18,r.y+r.h-18,panelOrder);
   if(onBoard)boardMark(g,r);
@@ -183,18 +190,19 @@ template<class G> void thumbnail(G&g,int W,int i,const uint8_t*raw,const char*do
 // Details' footer: Back, the Favorite star (a toggle: outlined, or filled when the game is a favorite) and Play, in thirds.
 inline int detailsButton(int W,int x) {return x<W/3?0:x<2*W/3?1:2;}
 template<class G> void detailsFooter(G&g,int W,int H,bool pinned) {
-  int y0=H-38;drawButton(g,0,y0,W/3-2,H,"Back");drawButton(g,2*W/3,y0,W,H,"Play");drawButton(g,W/3,y0,2*W/3-2,H,"");
+  int y0=detailsFooterTop(H);drawButton(g,0,y0,W/3-2,H,"Back");g.fillRoundRect(2*W/3,y0,W-2*W/3,H-y0,6,C_YELLOW);
+  Tile play={2*W/3,y0,W-2*W/3,H-y0,0,0};clippedText(g,play,"Play",(2*W/3+W)/2-24,y0+14,2,C_BLACK);drawButton(g,W/3,y0,2*W/3-2,H,"");
   bool s=W==320;int scale=s?1:2,R=s?9:11,tw=8*6*scale,x=W/3+(W/3-2-(2*R+6+tw))/2,cy=(y0+H)/2;
   drawStar(g,x+R,cy,R,C_YELLOW,!pinned,C_DARK);
-  Tile clip={W/3,y0,W/3-2,38,0,0};clippedText(g,clip,"Favorite",x+2*R+6,cy-4*scale,scale,pinned?C_YELLOW:C_WHITE);
+  Tile clip={W/3,y0,W/3-2,H-y0,0,0};clippedText(g,clip,"Favorite",x+2*R+6,cy-4*scale,scale,pinned?C_YELLOW:C_WHITE);
 }
 // An empty Favorites page: how to star a game, or (hidden) that the starred games are on a card that is not in.
 template<class G> void emptyFavorites(G&g,int W,bool hidden) {
-  Tile clip={8,40,W-16,80,0,0};int scale=W==320?1:2;
-  drawStar(g,24,64,12,C_YELLOW,true,C_BLACK);
-  clippedText(g,clip,hidden?"Your favorites are on a card":"No favorites yet.",44,48,scale,C_WHITE);
-  clippedText(g,clip,hidden?"that is not in right now.":"Open a game's Details",44,48+10*scale,scale,C_WHITE);
-  if(!hidden)clippedText(g,clip,"and tap the star.",44,48+20*scale,scale,C_WHITE);
+  Tile clip={12,header(W)+12,W-24,120,0,0};int y=header(W)+28;
+  drawStar(g,26,y+10,12,C_YELLOW,true,C_BLACK);
+  clippedText(g,clip,hidden?"Card is out":"No favorites yet",48,y,2,C_WHITE);
+  clippedText(g,clip,hidden?"Put your games' card back in.":"Open a game's Details",48,y+28,1,C_GRAY);
+  if(!hidden)clippedText(g,clip,"and tap Favorite to save it here.",48,y+42,1,C_GRAY);
 }
 // Details: the buttons for the game's own pages (picker.h detailsPageSpan). Text is 6 by 8 on the small board, 12 by 16 on the large.
 template<class G> void detailsPages(G&g,int W,int H,int mask) {
@@ -206,13 +214,13 @@ template<class G> void detailsPages(G&g,int W,int H,int mask) {
 }
 // A line under the title in Details: whether the game is a favorite, or that the list is full.
 template<class G> void detailsNote(G&g,int W,int H,const char*note) {
-  Tile clip={8,H-58,W-16,16,0,0};g.fillRect(8,H-58,W-16,16,C_BLACK);clippedText(g,clip,note,8,H-54,1,C_YELLOW);
+  Tile clip={8,H-58,W-16,14,0,0};g.fillRect(8,H-58,W-16,14,C_BLACK);clippedText(g,clip,note,8,H-56,1,C_YELLOW);
 }
 // The home page's first tile, Continue: the game's title picture (raw: its thumbnail, or null), "Continue" and the level
 // (0 based). cardOut: the game is on a card that is not in, so the tile says to put it back instead.
 template<class G> void continueTile(G&g,int W,int i,const uint8_t*raw,int level,bool cardOut,bool panelOrder=false) {
   if(cardOut){tileLabel(g,W,i,"Put the card back to continue",false,-1,panelOrder);return;}
-  auto r=tile(W,i);bool s=W==320;int scale=s?1:2,pw=s?64:96,ph=s?40:60,px0=r.x+(r.w-pw)/2,y=r.y+4;
+  auto r=tile(W,i);bool s=W==320;int scale=s?1:2,pw=s?64:96,ph=s?32:50,px0=r.x+(r.w-pw)/2,y=r.y+4;
   g.fillRect(r.x,r.y,r.w,r.h,C_DARK);
   if(raw){uint16_t row[144];for(int yy=0;yy<ph;yy++){
     for(int x=0;x<pw;x++){int idx=raw[524+(yy*60/ph)*96+x*96/pw];uint16_t c=raw[12+idx*2]|(raw[13+idx*2]<<8);row[x]=panelOrder?(c<<8)|(c>>8):c;}
@@ -245,20 +253,21 @@ template<class G> void drawBadge(G&g,int x,int y) {
 inline bool hitBack(int,int x) {return x<40;}
 inline bool hitSearch(int W,int x) {return x>=W-80&&x<W-40;}
 inline bool hitSettings(int W,int x) {return x>=W-40;}
-inline int pageArrow(int W,int x) {return x<56?-1:(x>=58&&x<114)?1:0;}  // -1 back, 1 next, 0 neither
+inline int pageArrow(int,int x) {return x<56?-1:(x>=58&&x<114)?1:0;}  // -1 back, 1 next, 0 neither
 inline bool hitAction(int W,int x) {return x>=W-100;}
 template<class G> void libraryFrame(G&g,int W,int H,const char*breadcrumb,int page,int pages,const char*action,bool back=true,bool picked=true) {
   // back=false on the root page (nothing above it); action=nullptr leaves the right-hand footer button off; the page arrows
   // go gray where there is no such page; picked=false (a game list, no game chosen yet) grays Details.
-  // Buttons are 40 px wide or more (32 tall in the bar, whose tap zone runs to the tiles); the title is doubled when it fits.
-  g.fillRect(0,0,W,32,C_DARK);if(back)drawButton(g,0,0,40,32,"<");else drawBadge(g,6,3);
-  int bx=back?46:38,room=W-88-bx,k=(int)strlen(breadcrumb)*12<=room?2:1;Tile clip={bx,0,room,32,0,0};
-  clippedText(g,clip,breadcrumb,bx,16-4*k,k,C_WHITE);
-  drawButton(g,W-80,0,W-40,32,"");drawButton(g,W-40,0,W,32,"");
-  drawBits20(g,W-70,6,MAGNIFIER20);drawBits20(g,W-30,6,GEAR20);
+  // Header targets are 40 px wide and 40/44 px tall; the title is doubled when it fits.
+  int bh=header(W);g.fillRect(0,0,W,bh,C_DARK);if(back)drawButton(g,0,0,40,bh,"<");else drawBadge(g,6,(bh-26)/2);
+  int bx=back?46:38,room=W-88-bx,k=(int)strlen(breadcrumb)*12<=room?2:1;Tile clip={bx,0,room,bh,0,0};
+  clippedText(g,clip,breadcrumb,bx,bh/2-4*k,k,C_WHITE);
+  drawButton(g,W-80,0,W-40,bh,"");drawButton(g,W-40,0,W,bh,"");
+  drawBits20(g,W-70,(bh-20)/2,MAGNIFIER20);drawBits20(g,W-30,(bh-20)/2,GEAR20);
   int f=footer(W);g.fillRect(0,f,W,H-f,C_BLACK);drawButton(g,0,f,56,H,"<",page>0);drawButton(g,58,f,114,H,">",page+1<pages);
   char count[24];snprintf(count,sizeof count,"%d/%d",page+1,pages?pages:1);
   Tile c={116,f,W-216,H-f,0,0};clippedText(g,c,count,122,f+(H-f-16)/2,2,C_WHITE);
+  Tile section={12,bh,W-24,14,0,0};clippedText(g,section,action?"GAMES":"COLLECTIONS",12,bh+2,1,C_GRAY);
   bool details=action&&!strcmp(action,"Details");(void)picked;
   if(action)drawButton(g,W-100,f,W,H,action,!details||picked);
 }

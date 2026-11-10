@@ -66,7 +66,7 @@ template <class G> int drawNotice(G& g, int W, int top, int bottom, const char* 
   int sc = W == 320 ? 1 : 2, cols = (W - 48) / (6 * sc);
   char lines[8][41];
   int n = wrapText(body, cols, lines, 8);
-  int hh = 24, h = hh + 10 + n * 10 * sc + 12;
+  int hh = 24, h = hh + 6 + n * 10 * sc + 8;
   int y = top + (bottom - top - h) / 2;
   if (y < top + 2) y = top + 2;
   g.fillRoundRect(12, y, W - 24, h, 6, C_DARK);
@@ -74,7 +74,7 @@ template <class G> int drawNotice(G& g, int W, int top, int bottom, const char* 
   Tile all = {12, y, W - 24, h, 0, 0};
   int hw = (int)strlen(heading) * 12;
   clippedText(g, all, heading, (W - hw) / 2, y + 8, 2, accent);
-  for (int i = 0; i < n; i++) clippedText(g, all, lines[i], 24, y + hh + 10 + i * 10 * sc, sc, C_WHITE);
+  for (int i = 0; i < n; i++) clippedText(g, all, lines[i], 24, y + hh + 6 + i * 10 * sc, sc, C_WHITE);
   return y + h;
 }
 // The "Check card" button under the empty-library notice: the same 44 pixel height on both boards. A tap reads the card again.
@@ -83,11 +83,11 @@ inline bool inEmptyButton(int W, int x, int y) { Tile b = emptyButton(W); return
 // The page area when no game is listed (a player with no Starter courses and no card games): what to do, in words, and a button
 // that reads the card again (the board cannot sense a card going in). The notice's bottom edge; 0 when there is nothing to say.
 template <class G> int drawEmptyNotice(G& g, int W, CardState s, int count) {
-  int top = 40, bottom = emptyButton(W).y - 4;
+  int top = header(W)+12, bottom = emptyButton(W).y - 4;
   int end = 0;
   switch (s) {
     case CARD_NONE: case CARD_READY:
-      end = drawNotice(g, W, top, bottom, "No games yet", "Put .GMP games in a folder named POCKET on a FAT32 microSD card and insert it, then tap Check card. Games and help: the Game-Maker: Sandbox Edition site.", C_WHITE); break;
+      end = drawNotice(g, W, top, bottom, "No games yet", "Copy .GMP games into /pocket on a FAT32 microSD card. Insert it, then tap Check card.", C_WHITE); break;
     case CARD_UNREADABLE: end = drawNotice(g, W, top, bottom, "Can't read the card", "Take it out and put it back in. The card should be FAT32. Then tap Check card.", C_YELLOW); break;
     case CARD_NOFOLDER: end = drawNotice(g, W, top, bottom, "No POCKET folder", "The card has no folder named POCKET. Make one on a computer and copy .GMP games into it, then tap Check card.", C_YELLOW); break;
     case CARD_READING: { char b[48]; snprintf(b, sizeof b, "Looking for games. Found so far: %d.", count); return drawNotice(g, W, top, bottom + 48, "Reading the card", b, C_WHITE); }
@@ -115,6 +115,25 @@ inline void wrapTitle(const char* name, int cols, char* l1, char* l2, size_t cap
   snprintf(l1, cap < (size_t)cut + 1 ? cap : (size_t)cut + 1, "%s", name);
   const char* rest = name + cut + (name[cut] == ' ' ? 1 : 0);
   ellipsize(rest, l2, cap, cols);
+}
+// The same Details composition is used by firmware and headless screenshots.
+template <class G> void detailsScreen(G& g,int W,int H,const char* name,const char* source,const char* advisory,int mask,bool pinned) {
+  g.fillRect(0,0,W,H,C_BLACK);
+  g.fillRect(0,0,W,header(W),C_DARK);
+  Tile all={12,0,W-24,H,0,0};
+  clippedText(g,all,"GAME DETAILS",12,header(W)/2-8,2,C_GRAY);
+  char a[64],b[64];wrapTitle(name,(W-24)/12,a,b,sizeof a);
+  clippedText(g,all,a,12,header(W)+10,2,C_WHITE);
+  if(b[0])clippedText(g,all,b,12,header(W)+30,2,C_WHITE);
+  clippedText(g,all,source,12,header(W)+60,1,C_YELLOW);
+  if(advisory)detailsTouch(g,W,detailsPagesTop(H)-20,advisory);
+  detailsPages(g,W,H,mask);
+  if(!mask)clippedText(g,all,"No extra pages in this game",12,detailsPagesTop(H)+14,1,C_GRAY);
+  detailsFooter(g,W,H,pinned);
+  if(pinned)detailsNote(g,W,H,"In Favorites");
+}
+template <class G> void emptyResults(G& g,int W,bool search) {
+  drawNotice(g,W,header(W)+12,footer(W),search?"No matching titles":"No games here",search?"Try a shorter title, search All games, or tap Clear.":"Try another collection. For card games, insert the card and use Settings > Card > Rescan card.",C_WHITE);
 }
 template <class G> void drawLoading(G& g, int W, int H, const char* name, int step, int of) {
   g.fillRect(0, 0, W, H, C_BLACK);

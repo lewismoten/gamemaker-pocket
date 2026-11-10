@@ -228,13 +228,13 @@ int main(int argc, char** argv) {
     shots += 4;
   }
 #ifdef POCKET_CYD28
-  {  // Settings, Display, Panel, Picture (picturetune.h): chips 32 x 32 or more, apart, found by the hit table; the commands
+  {  // Settings, Display, Panel, Picture (picturetune.h): chips 36 x 36 or more, apart, found by the hit table; the commands
     std::vector<pt::Box> all = {pt::backBox()};
     for (int r = 0; r < 2; r++) for (int k = 0; k < 4; k++) all.push_back(pt::chipBox(r, k));
     for (size_t i = 0; i < all.size(); i++) {
       const pt::Box& b = all[i];
       buttons++;
-      if (b.x1 - b.x0 < 32 || b.y1 - b.y0 < 32) fail("picture: a button under 32 x 32");
+      if (b.x1 - b.x0 < 36 || b.y1 - b.y0 < 36) fail("picture: a button under 36 x 36");
       if (b.x0 < 0 || b.y0 < 0 || b.x1 > scr::W || b.y1 > scr::H) fail("picture: a button off screen");
       for (size_t j = 0; j < i; j++) if (all[j].x0 < b.x1 && b.x0 < all[j].x1 && all[j].y0 < b.y1 && b.y0 < all[j].y1) fail("picture: buttons overlap");
       pt::Hit h = pt::hit((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2);
