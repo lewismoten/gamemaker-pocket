@@ -4,6 +4,43 @@ These run on a desktop, without a board, SD controller, display, or serial conne
 They supplement `web/scripts/pocketHostCheck.ts` (walkthrough parity), not replace it.
 Use a C++17 compiler and zlib development headers, plus Python 3. Run from the repository root.
 
+## Play core edge cases (without sanitizers)
+
+```sh
+mkdir -p /tmp/pocket-coretests
+c++ -std=c++17 -O1 -g -Wall -Wextra -Isrc \
+  host/coretest.cpp -o /tmp/pocket-coretests/coretest
+/tmp/pocket-coretests/coretest
+c++ -std=c++17 -O1 -g -Wall -Wextra -Isrc \
+  host/coreedgetest.cpp -lz -o /tmp/pocket-coretests/coreedgetest
+/tmp/pocket-coretests/coreedgetest
+```
+
+Run these with `DYLD_INSERT_LIBRARIES` unset. These recipes use return codes and
+checks, without ASan, injected libraries, signal handlers, or firmware changes.
+`coreedgetest` generates its own cfg and raw-deflate asset fixtures in memory. It
+checks every compressed truncation point of each mandatory asset, unpacked size
+boundaries, decoded block/frame/sequence/monster fields, metadata limits and empty
+labels, map edges/corners, missing-scene transitions, 200 live monsters and the
+50-sprite draw cap, score/lives/counter limits, and unsigned timer wrap. The host
+core reads the converted cfg and assets; this does **not** test a raw DOS `.GAM`
+parser. Truncated cfg records with all required fields present remain valid prefixes.
+
+Known bugs are strict expected failures (`XFAIL`; an unexpected pass fails):
+
+- Damaged start/link coordinates remain outside the map after entry and the
+  single-step bounds adjustment. Reads through `mapBlock` wrap, but later direct
+  map writes can be out of bounds. Probes stop before those unsafe writes.
+- Score addition has no defined signed 32-bit overflow path. The two overflow
+  probes check representability before the addition, rather than execute undefined
+  arithmetic. These are precondition diagnostics, not runtime overflow tests; review
+  them when implementing a defined score overflow rule. Ordinary score arithmetic
+  is exercised through both signed 32-bit endpoints and across the DOS 16-bit limit.
+
+Timer tests pin the raw unsigned deadline comparisons inherited from PLAYGAME's
+`moveChars`, `changeBlocks`, and monster movement, including early wrapped deadlines
+and waiting on pre-wrap deadlines. They do not assume a new rollover policy.
+
 ## Reader failures
 
 ```sh
