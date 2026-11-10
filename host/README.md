@@ -1,33 +1,76 @@
-# Pocket host failure and frame probes
+# Pocket host tests and frame probes
 
 These run on a desktop, without a board, SD controller, display, or serial connection.
 They supplement `web/scripts/pocketHostCheck.ts` (walkthrough parity), not replace it.
-Use a C++17 compiler and zlib development headers, plus Python 3. Run from the repository root.
+Use a C++17 compiler and zlib development headers, Python 3, and Node.js for the serial-page test. Run from the repository root.
+
+## Shared models and renders
+
+Run these from the repository root. Plain builds work on macOS without `timeout` or sanitizer runtime setup. The output stays in a temporary directory; assertions must stay enabled.
+
+```sh
+POCKET_TEST_OUT=$(mktemp -d "${TMPDIR:-/tmp}/pocket-host.XXXXXX")
+for size in 35 28; do
+  flags=""
+  if [ "$size" = 28 ]; then flags="-DPOCKET_CYD28"; fi
+  out="$POCKET_TEST_OUT/$size"
+  mkdir -p "$out"
+  for test in coretest serialfstest controlstest carddrawtest touchcaltest setuptest idletest paddrawtest firstruntest settingstest librarytest favoritestest setupshots playshots storytest; do
+    c++ -std=c++17 -O1 $flags -Isrc "host/$test.cpp" -lz -o "$out/$test" || exit 1
+    case "$test" in
+      librarytest|favoritestest|playshots) "$out/$test" data "$out" ;;
+      storytest) "$out/$test" data "$out" first-steps ;;
+      setupshots|firstruntest|settingstest) "$out/$test" "$out" ;;
+      paddrawtest) "$out/$test" "$out/pad.ppm" ;;
+      *) "$out/$test" ;;
+    esac || exit 1
+  done
+done
+node host/pocketdisktest.mjs
+python3 host/transitiontest.py
+python3 host/boardcardtest.py
+python3 host/profiletest.py
+```
+
+The shell block is for a POSIX shell (`sh` or `bash`); if using zsh, run it inside `sh` so the optional compiler flag expands as intended. The two sizes exercise the shared models and render assertions; saved PPM/PNG files let a person inspect the pictures. This command does not compare image hashes against the companion's stored snapshots. `hosttest.cpp` needs recorded key input; `cardstest.cpp` emits decoded-card hashes. The companion scripts compare those outputs with its engine (see below). `heaptest.cpp`, `frameprofile.cpp` and `iconsdump.cpp` are probes, not standalone pass/fail suites.
+
+All host results are **hardware-untested**. Real touch, display, audio, SD removal, NVS writes and power loss need board checks.
+
+## Engine parity in the companion checkout
+
+The engine and walkthroughs are in Game-Maker: Sandbox Edition, not this repo. From that checkout's `web/` folder, point the scripts at this worktree:
+
+```sh
+export GAMEMAKER_POCKET_DIR=/absolute/path/to/gamemaker-pocket
+npx vite-node scripts/pocketHostCheck.ts --resume
+npx vite-node scripts/pocketCardsCheck.ts
+npx vite-node scripts/pocketControlsCheck.ts
+```
+
+Use the absolute path to your own Pocket checkout. These scripts skip when they cannot find it; a skip is not a passed parity check. They need the companion's dependencies and packed game data. See [the firmware notes](../docs/FIRMWARE.md#check-the-play-loop-on-the-mac) for the comparisons.
 
 ## Reader failures
 
 ```sh
-mkdir -p "$TMPDIR/pocket-faults"
-c++ -std=c++17 -O1 -g -Wall -Wextra -fsanitize=address,undefined \
-  -fno-omit-frame-pointer -Isrc \
-  host/sdfaulttest.cpp -lz -o "$TMPDIR/pocket-faults/sdfaulttest"
-timeout 30 "$TMPDIR/pocket-faults/sdfaulttest" data first-steps
-timeout 30 "$TMPDIR/pocket-faults/sdfaulttest" data take-the-wheel
+POCKET_FAULT_OUT=$(mktemp -d "${TMPDIR:-/tmp}/pocket-faults.XXXXXX")
+c++ -std=c++17 -O1 -g -Wall -Wextra -Isrc \
+  host/sdfaulttest.cpp -lz -o "$POCKET_FAULT_OUT/sdfaulttest"
+"$POCKET_FAULT_OUT/sdfaulttest" data first-steps
+"$POCKET_FAULT_OUT/sdfaulttest" data take-the-wheel
 python3 host/transitiontest.py
 python3 host/boardcardtest.py
 c++ -std=c++17 -O1 -g -Wall -Wextra -Wno-unused-function \
-  -fsanitize=address,undefined -fno-omit-frame-pointer \
   -Isrc host/hostpaktest.cpp \
-  -o "$TMPDIR/pocket-faults/hostpaktest"
-"$TMPDIR/pocket-faults/hostpaktest" "$TMPDIR/pocket-faults"
+  -o "$POCKET_FAULT_OUT/hostpaktest"
+"$POCKET_FAULT_OUT/hostpaktest" "$POCKET_FAULT_OUT"
 ```
 
 The same probe accepts a loose microSD cfg's short name and its card pack filename:
 
 ```sh
-"$TMPDIR/pocket-faults/sdfaulttest" CARD_ROOT/pocket SHORTNAME SHORTNAME.pak
+"$POCKET_FAULT_OUT/sdfaulttest" CARD_ROOT/pocket SHORTNAME SHORTNAME.pak
 # One-file bundle (use the id stored inside its cfg, not the DOS .GMP filename):
-"$TMPDIR/pocket-faults/sdfaulttest" CARD_ROOT/pocket/NAME.GMP game-id
+"$POCKET_FAULT_OUT/sdfaulttest" CARD_ROOT/pocket/NAME.GMP game-id
 ```
 
 It chooses the first picture-bearing intro/exit/won/lost card list. A game with no
@@ -64,7 +107,8 @@ sweep, FAT test, or proof of controller timeout behavior. Test those separately 
 
 ```sh
 python3 host/profiletest.py
-# First generate microSD files with pocketData.ts --out CARD_ROOT (see ../README.md).
+# In the companion web/ folder, generate files with pocketData.ts --out CARD_ROOT.
+# Then return to this repository root; see the root README for the card layout.
 python3 host/profile.py \
   --data data --card CARD_ROOT/pocket \
   --out "$TMPDIR/pocket-profile" --expected-games 121

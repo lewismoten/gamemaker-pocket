@@ -160,9 +160,9 @@
               <legend>What to install</legend>
               <label class="ack"><input type="radio" name="variant" value="games" checked /> <span><strong>Player + starter games</strong> (recommended). The player and five real games to play right away, no microSD card needed: Virus Blaster, Snowbound, KEEP IT BRIEF!, Sandcastle Knight and Where's the Remote?!</span></label>
               <label class="ack"><input type="radio" name="variant" value="courses" /> <span><strong>Player + Starter courses.</strong> The player and the 106 short Starter lessons that teach how games are made.</span></label>
-              <label class="ack"><input type="radio" name="variant" value="player" /> <span><strong>Player only.</strong> No games on the board; you bring your own on a microSD card.</span></label>
+              <label class="ack"><input type="radio" name="variant" value="player" /> <span><strong>Player only.</strong> No games on the board; add your own on a microSD card or over USB with Send games.</span></label>
             </fieldset>
-            <label class="ack"><input type="checkbox" id="install-ack" /> <span>I understand this replaces the games and settings stored on the board (not the microSD card).</span></label>
+            <label class="ack"><input type="checkbox" id="install-ack" /> <span>I understand this replaces the games and file-based controls settings stored on the board. It keeps saved display setup and other NVS values, and leaves the microSD card alone.</span></label>
             <div id="install-slot" aria-live="polite"><p class="small">Pick a board and tick the box to show the Install button.</p></div>
             <h2>Steps</h2>
             <ol>
@@ -172,12 +172,12 @@
               <li>If it can't connect, hold the BOOT button while plugging in or while clicking Connect.</li>
             </ol>
             <h2>What gets installed</h2>
-            <p class="small" id="what">The player's firmware and, with <em>Player + starter games</em>, five games kept in the board's flash (they show an On board tag and play like card games); with <em>Player + Starter courses</em>, its library (the 106 Starter games). <em>Player only</em> leaves the library empty (just the player's font file), and the player then shows a screen that explains how to add games from a card. The install writes four parts of the 4 MB flash: bootloader, partition table, firmware, and the library's LittleFS area (the last 3 MB). It <strong>replaces the games stored on the board and the controls settings</strong> (<code>settings.txt</code> lives in that area). It <strong>keeps</strong> the display setup, touch calibration and other saved values (the board's NVS area, which is not written; checked on a real board: unchanged byte for byte after an install), and it never touches the microSD card. Anything else that was in the 3 MB library area is gone, so back it up first if you stored your own files there.</p>
+            <p class="small" id="what">The player's firmware and, with <em>Player + starter games</em>, five games kept in the board's flash (they show an On board tag and play like card games); with <em>Player + Starter courses</em>, its library (the 106 Starter games). <em>Player only</em> leaves the library empty (just the player's font file), and the player then shows a screen that explains how to add games from a card. The install writes four parts of the 4 MB flash: bootloader, partition table, firmware, and the library's LittleFS area (the last 3 MB). It <strong>replaces the games stored on the board and the file-based controls settings</strong> (<code>settings.txt</code> lives in that area). It <strong>keeps</strong> the display setup, touch calibration and other saved values (the board's NVS area, which is not written; checked on a real board: unchanged byte for byte after an install), and it never touches the microSD card. Anything else that was in the 3 MB library area is gone, so back it up first if you stored your own files there.</p>
           </div>
 
           <div role="tabpanel" id="p-games" aria-labelledby="tab-games" hidden>
             <h2>Adding games to a microSD card</h2>
-            <p class="small">The starter games (or the 106 Starters) are already on the board if you chose them. Any other game goes on a card, one <code>.GMP</code> file each. No card? The <a href="#send">Send games</a> tab puts them in the board's flash over USB.</p>
+            <p class="small">The starter games (or the 106 Starters) are already on the board if you chose them. Any other game goes on a card, one <code>.GMP</code> file each. No card? The Send games tab puts them in the board's flash over USB.</p>
             <ol>
               <li><strong>Get games.</strong> On the <a href="https://lewismoten.github.io/GameMaker-SandboxEdition/">Game-Maker: Sandbox Edition</a> site, open a game and choose Download, then <em>Pocket Player (microSD)</em>. It saves <code>NAME.GMP</code>.</li>
               <li><strong>Card.</strong> A microSD card formatted FAT32. Cards from 2 to 32 GB usually come that way; bigger cards usually come as exFAT, so reformat them as FAT32 first.</li>
@@ -187,9 +187,9 @@
             </ol>
             <h2>Good to know</h2>
             <ul>
-              <li>The list holds up to 512 games. A game whose id is already listed (a Starter, say) is skipped.</li>
-              <li>A file the player can't read as a game pack (wrong name, not format 1, damaged) is skipped without a message: it just isn't listed.</li>
-              <li>The player writes only inside <code>/pocket</code>: a library cache (<code>LIBRARY.CCH</code>) and display setups in <code>boards/</code>. Keep <code>boards/</code>.</li>
+              <li>The list holds up to 512 games. Copies with the same library UID appear once. A card copy replaces a game in the board's <code>/games</code> folder when its filename, game id or UID matches. Older packs with distinct filenames can remain separate even when their short game ids match.</li>
+              <li>A file the player can't read as a game pack (wrong name, not format 1, damaged) is skipped without a message: it just isn't listed. A pack with missing or bad optional library metadata can still appear under Imported, Unsorted.</li>
+              <li>The player writes only inside <code>/pocket</code>: a library cache (<code>LIBRARY.CCH</code>, written through <code>LIBRARY.NEW</code>) and display setups in <code>boards/</code>. Keep <code>boards/</code>.</li>
             </ul>
             <h2>Troubleshooting</h2>
             <ul>
@@ -229,8 +229,8 @@
             <p class="small">The pins, the screen size (320 x 240 or 480 x 320), the touch chip (XPT2046 resistive in the 2.8 build, GT911 capacitive in the 3.5 build), the 3.5 build's display driver (ST7796) and the chip family (plain ESP32). Source: <code>src/board.h</code>, <code>src/screen.h</code>, <code>platformio.ini</code>.</p>
             <h2>Adjustable on the device</h2>
             <p class="small">
-              Only the <strong>2.8 inch build</strong> has the display setup (first start, then BOOT or Settings, Display, Panel setup): driver (ILI9341 or ST7789), inverted colors, red and blue swapped, mirror and orientation, and touch calibration, saved per chip.
-              The <strong>3.5 inch build has no setup screen</strong>, so a wrong picture there can't be fixed on the device.
+              Only the <strong>2.8 inch build</strong> has the display setup (first start, then BOOT or Settings, Display, Panel setup): inverted colors, red and blue swapped, mirror and orientation, and touch calibration, saved per chip. Holding BOOT for 2 seconds on the game list changes the driver (ILI9341 or ST7789) and restarts setup.
+              The <strong>3.5 inch build has no panel setup screen</strong>, so a wrong picture there can't be fixed on the device.
             </p>
             <h2>Variants</h2>
             <div class="tablewrap">
@@ -238,18 +238,18 @@
                 <thead><tr><th scope="col">Board</th><th scope="col">Status</th><th scope="col">Why</th></tr></thead>
                 <tbody>
                   <tr><th scope="row">ESP32-2432S028, usual ILI9341</th><td class="st ok">Works with setup</td><td>The supported board: pick 2.8 inch.</td></tr>
-                  <tr><th scope="row">ESP32-2432S028 with two USB ports ("2 USB", ST7789)</th><td class="st ok">Works with setup</td><td>The firmware has an ST7789 driver for this revision: choose it in Panel setup (or hold BOOT 2 seconds on the list). From <code>docs/FIRMWARE.md</code>; not tested on one here.</td></tr>
+                  <tr><th scope="row">ESP32-2432S028 with two USB ports ("2 USB", ST7789)</th><td class="st mid">Hardware-untested</td><td>The 2.8 inch build includes an ST7789 driver; hold BOOT 2 seconds on the list to change driver and restart setup. This revision has not been tried on real hardware here.</td></tr>
                   <tr><th scope="row">28 board with inverted or red/blue-swapped colors</th><td class="st ok">Works with setup</td><td>Color bits in Panel setup (<code>src/displaysetup.h</code>).</td></tr>
-                  <tr><th scope="row">ESP32-3248S035 with resistive touch ("R")</th><td class="st mid">Needs a different build</td><td>The 3.5 build reads a GT911 capacitive chip only (<code>src/gt911.h</code>); no build here pairs 480 x 320 with resistive touch.</td></tr>
-                  <tr><th scope="row">ESP32-2432S024 2.4 inch (R or C)</th><td class="st no">Not supported yet</td><td>No build for it. Guess, unchecked: pins close to the 2.8, and the C version has a capacitive chip.</td></tr>
-                  <tr><th scope="row">ESP32-2432S032 3.2 inch</th><td class="st no">Not supported yet</td><td>No build for it. Guess, unchecked: its own touch wiring.</td></tr>
+                  <tr><th scope="row">ESP32-3248S035 with resistive touch ("R")</th><td class="st mid">Needs a different build</td><td>The running 3.5 inch build reads GT911 only. <code>src/board.h</code> defines an XPT2046 attachment, but <code>src/main.cpp</code> never calls it. Resistive touch on this model is hardware-untested.</td></tr>
+                  <tr><th scope="row">ESP32-2432S024 2.4 inch (R or C)</th><td class="st no">Not supported yet</td><td>No PlatformIO environment or pin map for it here; hardware-untested.</td></tr>
+                  <tr><th scope="row">ESP32-2432S032 3.2 inch</th><td class="st no">Not supported yet</td><td>No PlatformIO environment or pin map for it here; hardware-untested.</td></tr>
                   <tr><th scope="row">ESP32-S3 touch boards (larger Sunton and similar)</th><td class="st no">Not supported yet</td><td>A different chip. The installer says "Your ESP32-S3 board is not supported" and writes nothing (ESP Web Tools code in <code>ewt/</code>).</td></tr>
                 </tbody>
               </table>
             </div>
-            <p class="small">Facts beyond the firmware's own notes are marked as guesses and not checked. Community lists: <a href="https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display">witnessmenow's Cheap Yellow Display notes</a> and <a href="https://github.com/rzeldent/platformio-espressif32-sunton">rzeldent's Sunton board definitions</a> (the 3.5 inch board's speaker pin comes from rzeldent's definitions; see <code>NOTICE.md</code>).</p>
+            <p class="small">Hardware-untested means the code or model has not been tried on a real board here. Community lists: <a href="https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display">witnessmenow's Cheap Yellow Display notes</a> and <a href="https://github.com/rzeldent/platformio-espressif32-sunton">rzeldent's Sunton board definitions</a> (the 3.5 inch board's speaker pin comes from rzeldent's definitions; see <code>NOTICE.md</code>).</p>
             <div class="note">
-              <strong>Before you flash an unlisted board.</strong> You may see wrong colors, a mirrored or turned picture, touches in the wrong place, or a blank screen. On a 2.8 inch style board, open Panel setup (hold BOOT 2 seconds on the list, or tap the top left of the title bar) and step through the choices. Installing rewrites four parts of the board's flash. To go back, flash the board's own firmware again, or restore a backup made first.
+              <strong>Before you flash an unlisted board.</strong> You may see wrong colors, a mirrored or turned picture, touches in the wrong place, or a blank screen. On a 2.8 inch style board, press BOOT briefly on the game list to open Panel setup, or use Settings, Display, Panel setup. Hold BOOT 2 seconds to change the driver and restart setup. Installing rewrites four parts of the board's flash. To go back, flash the board's own firmware again, or restore a backup made first.
             </div>
             <details>
               <summary>Back up and restore with esptool</summary>
