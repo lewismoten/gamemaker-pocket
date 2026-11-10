@@ -23,7 +23,7 @@ constexpr int PIN_SCLK = 14, PIN_MOSI = 13, PIN_MISO = 12, PIN_CS = 15, PIN_DC =
 constexpr int PIN_XCLK = 25, PIN_XMOSI = 32, PIN_XMISO = 39, PIN_XCS = 33, PIN_XIRQ = 36;
 constexpr int PIN_LED_R = 4, PIN_LED_G = 16, PIN_LED_B = 17;
 // A display mode is three bits: 1 = ST7789 driver (else ILI9341), 2 = colors inverted, 4 = red and blue swapped (BGR).
-// Lewis's two units showed a rotated, mirrored picture and wrong colors with mode 0, and the panel's ID registers do not
+// Two test units showed a rotated, mirrored picture and wrong colors with mode 0, and the panel's ID registers do not
 // read back, so the modes are tried on the board: see the test pattern at boot (main.cpp). Turns 0..3 are landscape rotations
 // 1, 3, 5, 7 (5 and 7 are mirrored).
 enum PanelType { PANEL_ILI9341 = 0, PANEL_TYPES = 8 };
