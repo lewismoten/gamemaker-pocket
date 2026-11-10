@@ -84,13 +84,13 @@ int main(int argc, char** argv) {
   }
   {  // search keyboard: its taps are in main.cpp's loop()
     Shot g(W, H);
-    pk::drawKeyboard(g, W, H, 32, "TIN");
+    pk::drawKeyboard(g, W, H, pk::searchTitleH(W), "TIN");
     pk::drawSearchHeader(g, W, true);
     pk::drawSmallIcon(g, 0, 50, 8, true);
     Rects rs;
-    rs.push_back({0, 0, pk::SEARCH_BACK_W, pk::SEARCH_HEADER_HIT_H}); rs.push_back({pk::SEARCH_SCOPE_X0, 0, pk::searchScopeX1(W), pk::SEARCH_HEADER_HIT_H}); rs.push_back({W - pk::SEARCH_CLEAR_W, 0, W, pk::SEARCH_HEADER_HIT_H});
+    rs.push_back({pk::SEARCH_SCOPE_X0, 0, pk::searchScopeX1(W), pk::searchTitleH(W)}); rs.push_back({cx::box(W).x0, 0, cx::box(W).x1, pk::searchTitleH(W)});
     for (int k = 0; k < 3; k++) { int x0 = -1, x1 = -1; for (int x = 0; x < W; x++) if (pk::keyboardAction(W, x) == k) { if (x0 < 0) x0 = x; x1 = x + 1; } rs.push_back({x0, H - 36, x1, H}); }
-    int top = 58, step = (H - top - 38) / 4;  // a key is the whole cell tx*9/W by (ty-top)/step
+    int top = pk::searchTitleH(W) + 26, step = (H - top - 38) / 4;  // a key is the whole cell tx*9/W by (ty-top)/step
     for (int i = 0; i < 36; i++) rs.push_back({i % 9 * W / 9, top + i / 9 * step, (i % 9 + 1) * W / 9, top + (i / 9 + 1) * step});
     save(dir, name("search"), g, rs);
   }

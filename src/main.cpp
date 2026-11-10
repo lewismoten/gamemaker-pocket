@@ -1125,7 +1125,7 @@ static void drawPicker(bool clear = true, bool paging = false) {
   Serial.printf("LIB page ms=%lu catalog=%u free=%u largest=%u\n",(unsigned long)(millis()-t),(unsigned)sizeof(pk::Catalog),(unsigned)ESP.getFreeHeap(),(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 }
 static void drawSearch() {
-  tft.fillScreen(C_BLACK);pk::drawKeyboard(tft,scr::W,scr::H,32,searchText);
+  tft.fillScreen(C_BLACK);pk::drawKeyboard(tft,scr::W,scr::H,pk::searchTitleH(scr::W),searchText);
   pk::drawSearchHeader(tft,scr::W,searchAll);
   pk::drawSmallIcon(tft,searchAll?0:18,50,8,true);
 }
@@ -2538,7 +2538,7 @@ void loop() {
       if(ty<pk::header(scr::W)) {
         if(pk::hitSettings(scr::W,tx)){stopCardScan();openSettings(false);}
         else if(pk::hitSearch(scr::W,tx)){stopCardScan();strcpy(savedSearch,searchText);savedAll=searchAll;savedBrowsing=browsingCategories;mode=SEARCH_SCREEN;drawSearch();}
-        else if(pk::hitBack(scr::W,tx)&&!(browsingCategories&&!category&&!searchText[0])){  // the root page has no back arrow
+        else if(pk::hitClose(scr::W,tx)&&!(browsingCategories&&!category&&!searchText[0])){  // the root page has no Close X
           if(searchText[0])searchText[0]=0;
           else if(!browsingCategories&&(category==1||category==5||category==6)){browsingCategories=true;subcategory=-1;}
           else {browsingCategories=true;category=0;subcategory=-1;}page=0;selected=-1;drawPicker();
@@ -2566,8 +2566,8 @@ void loop() {
   }
   if(mode==DETAILS_SCREEN){
     if(menuTap(prs::SC_DETAILS,tx,ty)){int b=pk::detailsButton(scr::W,tx),k=pk::detailsPageAt(scr::W,scr::H,detailsMask,tx,ty);
-      if(k>=0)readMenuPages(k);
-      else if(b==0){mode=PICKER;drawPicker();}
+      if(ty<pk::header(scr::W)){if(cx::hit(scr::W,tx,ty)){mode=PICKER;drawPicker();}}  // the Close X: Details' old Back
+      else if(k>=0)readMenuPages(k);
       else if(b==1){int r=toggleFavorite(games[selected].uid);drawDetails();pk::detailsNote(tft,scr::W,scr::H,pinMessage(r));}
       else{if(!launchGame(selected))enterPicker();else wasDown=true;}}delay(5);return;
   }
@@ -2576,16 +2576,16 @@ void loop() {
     static uint32_t bkNext = 0;
     if (freshTap(tx, ty)) {
       char previous[sizeof searchText];memcpy(previous,searchText,sizeof previous);
-      int n=strlen(searchText),top=58,step=(scr::H-top-38)/4;
-      if(ty<pk::SEARCH_HEADER_HIT_H){if(tx<40){strcpy(searchText,savedSearch);searchAll=savedAll;browsingCategories=savedBrowsing;mode=PICKER;drawPicker();return;}if(tx>=scr::W-pk::SEARCH_CLEAR_W){searchText[0]=0;}else if(tx>=pk::SEARCH_SCOPE_X0&&tx<pk::searchScopeX1(scr::W)){searchAll=!searchAll;drawSearch();}}
+      int n=strlen(searchText),top=pk::searchTitleH(scr::W)+26,step=(scr::H-top-38)/4;
+      if(ty<pk::searchTitleH(scr::W)){if(cx::hit(scr::W,tx,ty)){strcpy(searchText,savedSearch);searchAll=savedAll;browsingCategories=savedBrowsing;mode=PICKER;drawPicker();return;}if(tx>=pk::SEARCH_SCOPE_X0&&tx<pk::searchScopeX1(scr::W)){searchAll=!searchAll;drawSearch();}}
       else if(ty>=scr::H-36){int b=pk::keyboardAction(scr::W,tx);if(b==0&&n<24){searchText[n]=' ';searchText[n+1]=0;}if(b==1&&n){searchText[n-1]=0;bkOn=true;bkNext=now+prs::REPEAT_DELAY_MS;}if(b==2){page=0;selected=-1;browsingCategories=false;mode=PICKER;drawPicker();return;}}
       else if(ty>=top&&ty<top+4*step&&n<24){searchText[n]="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[(ty-top)/step*9+tx*9/scr::W];searchText[n+1]=0;}
-      pk::drawSearchText(tft,32,searchText,previous);
+      pk::drawSearchText(tft,pk::searchTitleH(scr::W),searchText,previous);
     }else if(bkOn){  // Backspace held: it repeats (400 ms, then 8 a second) while the finger stays on it
       int n=strlen(searchText);
       if(pts.n==0||pts.y[0]<scr::H-36||pk::keyboardAction(scr::W,pts.x[0])!=1)bkOn=false;
       else if(now>=bkNext&&n){char previous[sizeof searchText];memcpy(previous,searchText,sizeof previous);searchText[n-1]=0;
-        bkNext=now-bkNext>prs::REPEAT_EVERY_MS?now+prs::REPEAT_EVERY_MS:bkNext+prs::REPEAT_EVERY_MS;pk::drawSearchText(tft,32,searchText,previous);}
+        bkNext=now-bkNext>prs::REPEAT_EVERY_MS?now+prs::REPEAT_EVERY_MS:bkNext+prs::REPEAT_EVERY_MS;pk::drawSearchText(tft,pk::searchTitleH(scr::W),searchText,previous);}
     }delay(5);return;
   }
 #ifdef POCKET_CYD28

@@ -122,6 +122,7 @@ template <class G> void detailsScreen(G& g,int W,int H,const char* name,const ch
   g.fillRect(0,0,W,header(W),C_DARK);
   Tile all={12,0,W-24,H,0,0};
   clippedText(g,all,"GAME DETAILS",12,header(W)/2-8,2,C_GRAY);
+  cx::draw(g,W);
   char a[64],b[64];wrapTitle(name,(W-24)/12,a,b,sizeof a);
   clippedText(g,all,a,12,header(W)+10,2,C_WHITE);
   if(b[0])clippedText(g,all,b,12,header(W)+30,2,C_WHITE);

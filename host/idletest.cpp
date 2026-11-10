@@ -146,7 +146,7 @@ int main() {
         found++;
         return true;
       };
-      assert(check(5, 5) && check(c.W - 40, 5) && check(c.W - 5, 5));                // back, search, settings
+      assert(check(pk::searchX0(c.W) + 5, 5) && check(pk::gearX0(c.W) + 5, 5) && check(c.W - 5, 5));    // search, settings, close
       assert(check(20, c.H - 5) && check(70, c.H - 5) && check(c.W - 20, c.H - 5));  // previous, next, action
       for (int i = 0; i < 6; i++) {
         prs::Rect t = prs::tileRect(W, i);

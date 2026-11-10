@@ -84,7 +84,7 @@ card.uid[0]=1;assert(pk::sdBeatsBoard(card,board));  // or the same uid
     {  // pressed looks: a tile, then the gear and the next-page button (each drawn over the idle page; the frame sits inside the button)
       static Phys base;base=fb;
       prs::Rect t=prs::tileRect(W,1);prs::drawPressed(fb,t);assert(!fb.clipped);save(fb,out+"/pressed-tile-"+std::to_string(W)+".ppm");
-      fb=base;prs::Ctx c;c.W=W;c.H=fb.H;c.next=true;prs::Rect g,n;assert(prs::under(c,W-10,10,g)&&g.x1==W&&g.y1==pk::header(W));assert(prs::under(c,60,fb.H-5,n)&&n.x0==58);assert(!prs::under(c,20,fb.H-5,n));  // Previous is off on the first page
+      fb=base;prs::Ctx c;c.W=W;c.H=fb.H;c.next=true;prs::Rect g,n;assert(prs::under(c,pk::gearX0(W)+10,10,g)&&g.x1==pk::gearX0(W)+40&&g.y1==pk::header(W));assert(prs::under(c,60,fb.H-5,n)&&n.x0==58);assert(!prs::under(c,20,fb.H-5,n));  // Previous is off on the first page
 prs::drawPressed(fb,g);prs::drawPressed(fb,n);assert(!fb.clipped);save(fb,out+"/pressed-gear-next-"+std::to_string(W)+".ppm");
       fb=base;
     }
@@ -173,7 +173,7 @@ prs::drawPressed(fb,g);prs::drawPressed(fb,n);assert(!fb.clipped);save(fb,out+"/
       }
       // the chip text, long counts included, never reaches the Search button
       for(CardState s:{CARD_READING,CARD_READY,CARD_NONE,CARD_UNREADABLE,CARD_NOFOLDER}){char t[32];cardChipText(s,512,t,sizeof t);assert(t[0]&&strlen(t)<26);}
-      pk::clearTiles(fb,W);libraryFrame(fb,W,fb.H,"Starters",0,2,"Details");assert(fb.px[(pk::header(W)/2)*W]==C_WHITE);  // deeper pages keep their back arrow
+      pk::clearTiles(fb,W);libraryFrame(fb,W,fb.H,"Starters",0,2,"Details");{auto b=cx::box(W);int white=0;for(int y=b.y0;y<b.y1;y++)for(int x=b.x0;x<b.x1;x++)white+=fb.px[y*W+x]==C_WHITE;assert(white>20);}  // deeper pages show the Close X
       const char*title="Moving and Pushing, a rather long game title that needs an ellipsis";
       {  // the loading title wraps to two lines, whole words, nothing cut to "..." unless it is longer than both lines
         int cols=(W-32)/12;char l1[64],l2[64];

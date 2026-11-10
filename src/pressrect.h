@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "overlaydraw.h"
 #include "picker.h"
+#include "picker_draw.h"
 #include "settingsdraw.h"
 namespace prs {
 struct Rect {
@@ -35,9 +36,9 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
     case SC_PICKER: {
       int f = pk::footer(W);
       if (y < pk::header(W)) {
-        if (x >= W - 40) r = {W - 40, 0, W, pk::header(W)};
-        else if (x >= W - 84 && x < W - 44) r = {W - 84, 0, W - 44, pk::header(W)};
-        else if (x < 40 && c.back) r = {0, 0, 40, pk::header(W)};
+        if (pk::hitSettings(W, x)) r = {pk::gearX0(W), 0, pk::gearX0(W) + 40, pk::header(W)};
+        else if (pk::hitSearch(W, x)) r = {pk::searchX0(W), 0, pk::searchX0(W) + 40, pk::header(W)};
+        else if (pk::hitClose(W, x) && c.back) r = {cx::box(W).x0, 0, cx::box(W).x1, pk::header(W)};
         else return false;
       } else if (y >= f) {
         if (x < 54 && c.prev) r = {0, f, 54, H};
@@ -54,7 +55,8 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
       }
       return r.has(x, y);
     }
-    case SC_DETAILS: {  // Title, Story, Instructions (picker_draw.h detailsPages), then Back, Favorite, Play (detailsFooter)
+    case SC_DETAILS: {  // the Close X, Title, Story, Instructions (picker_draw.h detailsPages), then Favorite, Play (detailsFooter)
+      if (y < pk::header(W)) { r = {cx::box(W).x0, 0, cx::box(W).x1, pk::header(W)}; return pk::hitClose(W, x) && cx::hit(W, x, y); }
       int k = pk::detailsPageAt(W, H, c.pages, x, y), x0, x1;
       if (k >= 0 && pk::detailsPageSpan(W, c.pages, k, x0, x1)) {
         r = {x0, pk::detailsPagesTop(H), x1, pk::detailsPagesBottom(H)};
@@ -62,7 +64,8 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
       }
     }
       if (y < pk::detailsFooterTop(H)) return false;
-      r = x < W / 3 ? Rect{0, pk::detailsFooterTop(H), W / 3 - 4, H} : x < 2 * W / 3 ? Rect{W / 3, pk::detailsFooterTop(H), 2 * W / 3 - 4, H} : Rect{2 * W / 3, pk::detailsFooterTop(H), W, H};
+      r = x < W / 2 ? Rect{0, pk::detailsFooterTop(H), W / 2 - 4, H} : Rect{W / 2, pk::detailsFooterTop(H), W, H};
+      if (x >= W / 2 - 4 && x < W / 2) return false;
       return r.has(x, y);
     case SC_DISPLAY:
       if (y >= H - 38) r = {6, H - 38, 100, H - 2};
