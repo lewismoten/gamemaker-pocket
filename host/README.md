@@ -108,3 +108,5 @@ these frame measurements. No board performance budget is defined by this tool. T
 comparison to that cadence must be labeled a host-only diagnostic, not a CYD pass/fail.
 
 The Send games page's code (`docs/pocketdisk.js`) has a Node test with a mock Web Serial port: `node host/pocketdisktest.mjs`. The serial file commands' parser is `host/serialfstest.cpp`, and the play core's count clamps are in `host/coretest.cpp`.
+
+Screen capture framing and PNG writer: `python3 host/screenshottest.py` (stdlib Python and C++17, no hardware). Covers the firmware framer at both board sizes, software rotation, malformed/truncated transfers, and PNG pixels/CRCs.

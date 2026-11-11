@@ -21,6 +21,7 @@
 #include "fwid.h"
 #include "gmcfg.h"
 #include "serialfs.h"
+#include "screenshot.h"
 #include "screen.h"
 #include "picker_draw.h"
 #include "splash.h"
@@ -50,6 +51,19 @@ static sg::SoftGfx<LGFX> tft(tftHw);       // what everything draws on: the pict
 static LGFX tft;
 static LGFX& tftHw = tft;
 #endif
+// readRect returns panel-order (big endian) RGB565 with setSwapBytes(false).
+static shot::Transfer screenShot;
+static void pollScreenshot() {
+  if (!screenShot.active) return;
+  screenShot.poll(Serial, [](unsigned x, unsigned y, unsigned n, uint8_t* out) {
+#ifdef POCKET_CYD28
+    shot::readPixels(tftHw, tft.mode(), x, y, n, out);
+#else
+    shot::readPixels(tftHw, 0, x, y, n, out);
+#endif
+  });
+  delay(0);  // return to the caller between chunks; never wait for a host ACK
+}
 static Touch gt;
 // ---- which firmware, which board (fwid.h) ----
 static char boardName[6] = "";
@@ -60,6 +74,15 @@ static void fwBoardLoad() {
 }
 // "FW" prints the build; "ID set X" names the board. Also called by the setup's serial poll. True when the line was one of them.
 static bool fwSerial(const char* buf) {
+  if (!strcmp(buf, "SHOT")) {
+    screenShot.start(Serial, scr::W, scr::H);
+    return true;
+  }
+  if (!strcmp(buf, "SHOT ABORT")) {
+    screenShot.active = false;
+    Serial.println("SHOT ERR aborted");
+    return true;
+  }
   if (!strncmp(buf, "FW", 2)) {
     Serial.printf("FW board=%s git=%s date=%s env=%s\n", boardName, FW_GIT, FW_DATE, FW_ENV);
     return true;
@@ -747,6 +770,7 @@ static uint32_t lastPoll = 0;
 static bool traceOn = false, injOn = false;
 static int injX = 0, injY = 0;
 static void pollTouch(uint32_t now) {
+  pollScreenshot();
   if (injOn) { pts.n = 1; pts.id[0] = 0; pts.x[0] = injX; pts.y[0] = injY; pts.size[0] = 40; return; }
   if (!haveGT) { pts.n = 0; return; }
   if (now - lastPoll >= 8) {
@@ -2122,7 +2146,9 @@ static void pollSerial() {
     if (c == '\n' || c == '\r') {
       buf[n] = 0;
       n = 0;
-      if (buf[0] == 'S' && isSetupCommand(buf)) {
+      if (!strcmp(buf, "SHOT") || !strcmp(buf, "SHOT ABORT")) {
+        fwSerial(buf);
+      } else if (buf[0] == 'S' && isSetupCommand(buf)) {
 #ifdef POCKET_CYD28
         dsSerial(buf);
 #endif

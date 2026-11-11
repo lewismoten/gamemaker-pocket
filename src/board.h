@@ -134,7 +134,7 @@ class LGFX : public lgfx::LGFX_Device {
     c.offset_x = 0;
     c.offset_y = 0;
     c.offset_rotation = 0;
-    c.readable = false;
+    c.readable = true;  // SHOT panel readback (requires wired MISO)
     c.invert = inv;
     c.rgb_order = false;
     c.dlen_16bit = false;
@@ -185,7 +185,7 @@ class LGFX : public lgfx::LGFX_Device {
       c.offset_x = 0;
       c.offset_y = 0;
       c.offset_rotation = 0;
-      c.readable = false;
+      c.readable = true;  // SHOT panel readback (requires wired MISO)
       c.invert = false;  // if colors look inverted on the board, flip this
       c.rgb_order = false;
       c.dlen_16bit = false;

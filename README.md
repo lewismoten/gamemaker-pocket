@@ -51,6 +51,7 @@ After changing the packed data format here, repack in Game-Maker: Sandbox Editio
 
 Python 3 with `pyserial` (PlatformIO's Python has it: `~/.platformio/penv/bin/python`). Run from this folder. Board letters (A, B, C) are set on a board with the serial command `ID set X`.
 
+- `python3 scripts/pocketScreenshot.py PORT OUT.png` captures the display over USB at 115200 without a camera (macOS/Linux, Python stdlib only). Pause for a stable picture; requires working panel MISO readback. See [screen capture protocol and hardware limits](docs/FIRMWARE.md#serial-screen-capture).
 - `scripts/pocketStatus.py PORT "text"` shows a banner on the board without resetting it (`open_port` is the no-reset port helper the others use); `--find` lists which board is on which port.
 - `scripts/pocketWalk.py --board C scripts/pocket-walks/first-run.txt` plays a script of taps and holds over serial, with expectations and optional camera pictures (the camera step needs a Game-Maker checkout, `GAMEMAKER_DIR`).
 - `scripts/pocketBoardCheck.py`, `pocketHeldTrace.py`: check held input and trace it on a board.

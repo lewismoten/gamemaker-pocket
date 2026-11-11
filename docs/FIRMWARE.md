@@ -281,6 +281,55 @@ Display SPI: SCLK 14, MOSI 13, MISO 12, CS 15, DC 2, backlight 27. GT911 (I2C): 
 
 `--dry-run` prints the plan only. It stops if any board's lock folder is taken, never writes to a card and never touches the saved display setup. Ctrl-C ends it cleanly.
 
+## Serial screen capture
+
+`SHOT` (115200 baud, newline terminated) streams RGB565 from display RAM on either
+board, including menus, overlays, status strip and display setup. `SHOT ABORT` cancels.
+Run `python3 scripts/pocketScreenshot.py /dev/cu.usbserial-XXXX /tmp/pocket.png` from
+this repository. This macOS/Linux tool uses only Python's standard library, leaves
+DTR/RTS untouched, and saves a PNG only after validating the complete transfer.
+Close other serial monitors first. It sets no test banner. A saved binary serial
+transcript can also be decoded with `--input dump.bin OUT.png`.
+
+This is a **rolling capture**, not an atomic screenshot: pause a game first for a
+stable image. The firmware reads at most 32 pixels and sends at most 64 pixel bytes
+per input poll, then yields and returns to normal work (including between rows).
+No full-screen allocation or host acknowledgment wait is used. At 115200 the largest
+packet occupies about 9 ms of wire time; frame timing has not been measured on hardware.
+A capture takes tens of seconds depending on drawing and poll frequency. Heavy serial
+tracing increases the time; the host allows 180 seconds. Abort or retry a failed capture.
+
+**Hardware limit:** capture requires the panel's SDO/MISO to be wired and working.
+`src/board.h` enables LovyanGFX readback on both board targets. Some CYD revisions
+have no usable display readback (the existing panel-ID notes above describe this);
+these can return a uniform black/white or invalid picture with a valid transport CRC.
+CRC proves USB payload integrity, not that the glass answered correctly. There is no
+software framebuffer fallback: this feature cannot recover pixels from an unwired
+panel. Hardware colors/inversion, backlight and panel gamma are not represented by
+RGB565 RAM. CYD software landscape rotation is mapped back to logical 320 x 240.
+Neither board's readback has been verified on hardware for this change.
+
+Protocol v1 (ASCII headers end in LF; CRLF is also accepted by the host):
+
+```text
+SHOT BEGIN 1 <width> <height> RGB565BE
+SHOT DATA <byte-offset> <byte-count> <crc32-hex>
+<exactly byte-count binary bytes><LF>
+... repeat, in row-major order ...
+SHOT END <total-byte-count> <whole-crc32-hex>
+```
+
+Dimensions are 320 x 240 or 480 x 320. Each chunk is an even number of bytes,
+1–32 pixels, never crossing a row; offsets start at zero and increase without gaps.
+Pixels are big endian RGB565 (red bits 15–11, green 10–5, blue 4–0). Both CRCs are
+standard IEEE CRC-32, matching Python `binascii.crc32`; chunk CRC covers its binary
+payload, whole CRC covers concatenated pixel payloads. Unrelated log lines can occur
+between packets. Errors are `SHOT ERR busy` or `SHOT ERR aborted`. The host rejects
+bad offsets, lengths, dimensions, CRCs, malformed framing and truncated transfers.
+Host coverage: `python3 host/screenshottest.py` compiles the actual firmware framer,
+checks both board sizes and rotation mappings, corruption/truncation rejection, and
+PNG color expansion and chunk CRCs. It does not access a serial device.
+
 ## Held-input trace
 
 For a live check of the touch path over USB (serial 115200): `V 1` prints every new GT911 report (`R ms n= id= x= y= size=`) and, each game tick, the keys the game holds (`K ms tick= up= down= left= right= space= pad= n=`); `V 0` stops it. `G <index>` starts a game from the list; `I x y` holds a made-up finger at that screen point (no chip involved, so it shows what the controls and the loop do with a steady touch) and `I off` lifts it. `web/scripts/pocketHeldTrace.py <port> <index|-> [x y] [seconds]` runs it and summarizes ticks with Up down, tick gaps, report gaps and zero-point reports; with `-` and no x y it just listens while someone holds the screen.
