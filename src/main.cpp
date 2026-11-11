@@ -21,6 +21,8 @@
 #include "fwid.h"
 #include "gmcfg.h"
 #include "gmsave.h"
+#include "saveslots.h"
+#include "slotdraw.h"
 #include "gmhiscore.h"
 #include "gmmenu.h"
 #include "dosmenudraw.h"
@@ -1231,15 +1233,29 @@ static ovl::PauseArm pauseArm;
 static void gameFilePath(char* out, size_t cap, const char* ext) { snprintf(out, cap, "/%08x.%s", (unsigned)pk::crc32(activeGame.uid, 16), ext); }
 static bool wrFile(void* u, const void* p, size_t n) { return ((File*)u)->write((const uint8_t*)p, n) == n; }
 static bool rdFile(void* u, void* p, size_t n) { return ((File*)u)->read((uint8_t*)p, n) == n; }
-static bool pauseSaved = false;  // the game has a saved game (the Load game button; Save game asks before writing over it)
+static bool storeExists(void*, const char* p) { return LittleFS.exists(p); }
+static bool storeRead(void*, const char* p, void* buf, size_t n) { File f = LittleFS.open(p, "r"); bool ok = f && f.size() == n && f.read((uint8_t*)buf, n) == n; if (f) f.close(); return ok; }
+static bool storeWrite(void*, const char* p, const void* buf, size_t n) {  // written beside the old file and swapped in, so a failed write keeps it
+  char tmp[28];
+  snprintf(tmp, sizeof tmp, "%s.t", p);
+  File f = LittleFS.open(tmp, "w");
+  bool ok = f && f.write((const uint8_t*)buf, n) == n;
+  if (f) f.close();
+  if (ok) { LittleFS.remove(p); ok = LittleFS.rename(tmp, p); } else LittleFS.remove(tmp);
+  return ok;
+}
+static const gm::SlotStore slotStore = {nullptr, storeExists, storeRead, storeWrite};
+static bool pauseSaved = false;  // some slot holds a saved game (the Load game button is dimmed without one)
 static void drawPause() {
   Serial.println("SCREEN pause");
-  char path[24];
-  gameFilePath(path, sizeof path, "sav");
-  pauseSaved = LittleFS.exists(path);
+  gm::SlotList slots;
+  gm::slotsList(slotStore, pk::crc32(activeGame.uid, 16), slots);
+  pauseSaved = gm::slotsAny(slots);
   ovl::pauseMenu(tft, cfg.title, world.level, pauseArm.armed, pauseSaved);
 }
 
+// The pause menu again over its frame, after a screen of its own (the slot list, the name entry) drew over it.
+static void redrawPause() { tft.fillScreen(C_BLACK); last.valid = false; drawFrame(true); drawStrip(); drawPause(); wasDown = true; }
 static uint32_t t0 = 0, ticksRun = 0;
 static int curGame = -1;
 static bool fromPause = false;
@@ -1882,43 +1898,37 @@ static void showTopTen(uint8_t* pic, long latest) {
   waitTap(30);
   readingPages = false;
 }
-// CheckHighScores: when the score makes the Top Ten, a name entry on the Search keyboard (vowels green, Space, Del and Done blue), then
-// the table is saved. Returns the place (0: not in).
-static int highScoreEntry(long score, const uint8_t* bg) {
-  gm::HiTable t;
-  hiLoad(t);
-  int place = gm::hiInsert(t, score);
-  if (!place) return 0;
-  Serial.printf("SCREEN name place %d score %ld\n", place, score);
-  char name[gm::HIS_NAME_MAX + 1] = "";
+// The name entry on the Search keyboard (vowels green, Space, Del and Done blue): `name` (up to `max` letters) is edited in place, behind
+// the game's picture `bg` when it has one. True on Done; with `cancelable` a Close X is drawn and it gives false. The Top Ten and the
+// save slots both use it.
+static bool askName(const char* head, char* name, int max, const uint8_t* bg, bool cancelable) {
   const int titleH = pk::searchTitleH(scr::W), top = titleH + 26, step = (scr::H - top - 38) / 4;
   if (bg) { setPalette6(bg); pushPicture(bg + 768); }  // the game's Top Ten picture behind the keys
   else tft.fillScreen(C_BLACK);
   pk::drawKeyboard(tft, scr::W, scr::H, titleH, name, "Type your name", !bg);
-  char head[40];
-  snprintf(head, sizeof head, scr::SMALL ? "Top Ten! Number %d" : "Congratulations! You are number %d", place);
   tft.fillRect(0, 0, scr::W, titleH, C_BLACK);
   tft.setTextSize(2);
   tft.setTextColor(pk::C_YELLOW, C_BLACK);
   tft.setCursor(8, (titleH - 16) / 2);
   tft.print(head);
+  if (cancelable) cx::draw(tft, scr::W);
   wasDown = true;
-  bool done = false;
-  while (!done) {
+  for (;;) {
     uint32_t now = millis();
     if (Serial.available()) pollSerial();
     pollTouch(now);
     int tx, ty;
     if (freshTap(tx, ty)) {
-      char previous[sizeof name];
-      memcpy(previous, name, sizeof name);
+      if (cancelable && cx::hit(scr::W, tx, ty)) return false;
+      char previous[gm::HIS_NAME_MAX + 2];
+      memcpy(previous, name, strlen(name) + 1);
       int n = strlen(name);
       if (ty >= scr::H - 36) {
         int b = pk::keyboardAction(scr::W, tx);
-        if (b == 0 && n < gm::HIS_NAME_MAX) { name[n] = ' '; name[n + 1] = 0; }
+        if (b == 0 && n < max) { name[n] = ' '; name[n + 1] = 0; }
         if (b == 1 && n) name[n - 1] = 0;
-        if (b == 2) done = true;
-      } else if (ty >= top && ty < top + 4 * step && n < gm::HIS_NAME_MAX) {
+        if (b == 2) return true;
+      } else if (ty >= top && ty < top + 4 * step && n < max) {
         name[n] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[(ty - top) / step * 9 + tx * 9 / scr::W];
         name[n + 1] = 0;
       }
@@ -1927,6 +1937,18 @@ static int highScoreEntry(long score, const uint8_t* bg) {
     }
     delay(5);
   }
+}
+// CheckHighScores: when the score makes the Top Ten, a name entry, then the table is saved. Returns the place (0: not in).
+static int highScoreEntry(long score, const uint8_t* bg) {
+  gm::HiTable t;
+  hiLoad(t);
+  int place = gm::hiInsert(t, score);
+  if (!place) return 0;
+  Serial.printf("SCREEN name place %d score %ld\n", place, score);
+  char name[gm::HIS_NAME_MAX + 2] = "";
+  char head[40];
+  snprintf(head, sizeof head, scr::SMALL ? "Top Ten! Number %d" : "Congratulations! You are number %d", place);
+  askName(head, name, gm::HIS_NAME_MAX, bg, false);
   gm::hiSetName(t, place, name);
   hiSave(t);
   return place;
@@ -2715,38 +2737,78 @@ static bool menuTap(prs::Screen sc, int& tx, int& ty) {
   }
   return false;
 }
-// Save game (F5): the level's state in <hash>.sav, written beside the old one and swapped in, so a failed write keeps the old save.
+// ---- Save game (F5) and Load game (F6): ten slots, each with a name (saveslots.h; slotdraw.h draws the list) ----
 static void pauseNote(const char* msg) { ovl::pauseNote(tft, msg); }
+static uint32_t gameHash() { return pk::crc32(activeGame.uid, 16); }
+// The list until a slot is chosen: its number, or -1 for the Close X (or BOOT). Saving into a used slot takes a second tap.
+static int pickSlot(bool saving, gm::SlotList& l) {
+  gm::slotsList(slotStore, gameHash(), l);
+  gm::SlotArm arm;
+  Serial.printf("SCREEN slots %s\n", saving ? "save" : "load");
+  slotdraw::screen(tft, scr::W, scr::H, l, saving);
+  wasDown = true;
+  for (;;) {
+    uint32_t now = millis();
+    if (Serial.available()) pollSerial();
+    pollTouch(now);
+    if (arm.expire(now)) slotdraw::screen(tft, scr::W, scr::H, l, saving);
+    int tx, ty;
+    if (freshTap(tx, ty)) {
+      if (cx::hit(scr::W, tx, ty)) return -1;
+      int slot = gm::slotAt(scr::W, scr::H, tx, ty), was = arm.armed;
+      int act = arm.tap(l, slot, saving, now);
+      clickSound();
+      Serial.printf("SLOT tap %d act %d\n", slot, act);
+      if (act == gm::SLOT_GO) return slot;
+      if (act == gm::SLOT_ARMED || was >= 0) slotdraw::screen(tft, scr::W, scr::H, l, saving, arm.armed);
+    }
+    if (digitalRead(0) == LOW) return -1;
+    delay(5);
+  }
+}
 static void pauseSaveGame() {
-  char path[24], tmp[28];
-  gameFilePath(path, sizeof path, "sav");
+  gm::SlotList l;
+  int slot = pickSlot(true, l);
+  if (slot < 0) { redrawPause(); return; }
+  char name[gm::SLOT_NAME + 1];
+  snprintf(name, sizeof name, "%s", l.used[slot] ? l.name[slot] : "");
+  char head[24];
+  snprintf(head, sizeof head, "Name slot %d", slot + 1);
+  if (!askName(head, name, gm::SLOT_NAME_MAX, nullptr, true)) { redrawPause(); return; }  // cancelled: nothing is written
+  char path[24];
+  gm::slotPath(path, sizeof path, gameHash(), slot);
+  if (LittleFS.totalBytes() - LittleFS.usedBytes() < 40000 && !LittleFS.exists(path)) { redrawPause(); pauseNote("No room to save"); return; }
+  char tmp[28];
   snprintf(tmp, sizeof tmp, "%s.t", path);
-  if (LittleFS.totalBytes() - LittleFS.usedBytes() < 40000 && !LittleFS.exists(path)) { pauseNote("No room to save"); return; }
   File f = LittleFS.open(tmp, "w");
   bool ok = f && gm::saveWorld(world, wrFile, &f);
   if (f) f.close();
   if (ok) { LittleFS.remove(path); ok = LittleFS.rename(tmp, path); } else LittleFS.remove(tmp);
-  Serial.printf("SAVE %s\n", ok ? "ok" : "failed");
-  drawPause();
+  if (ok) ok = gm::slotSetName(slotStore, gameHash(), slot, name);
+  Serial.printf("SAVE slot %d %s\n", slot + 1, ok ? "ok" : "failed");
+  redrawPause();
   pauseNote(ok ? "Game saved" : "Could not save");
 }
-// Load game (F6): the saved level is entered fresh, then the saved state goes over it (what LoadGame does).
+// Load game (F6): the chosen slot's level is entered fresh, then the saved state goes over it (what LoadGame does).
 static void pauseLoadGame() {
+  gm::SlotList l;
+  int slot = pickSlot(false, l);
+  if (slot < 0) { redrawPause(); return; }
   char path[24];
-  gameFilePath(path, sizeof path, "sav");
+  gm::slotPath(path, sizeof path, gameHash(), slot);
   File f = LittleFS.open(path, "r");
   gm::EntryState e;
   bool ok = f && gm::saveCheck(rdFile, &f, f.size());
   if (ok) { f.seek(0); ok = gm::saveReadEntry(rdFile, &f, e); }
   if (f) f.close();
-  if (!ok) { Serial.println("LOAD damaged"); pauseNote("Saved game unreadable"); return; }
+  if (!ok) { Serial.println("LOAD damaged"); redrawPause(); pauseNote("Saved game unreadable"); return; }
   spk::stop();
   world.releaseAll();
   controls.reset();
   assets.release();
   ok = world.restore(e);
   if (ok) { File g = LittleFS.open(path, "r"); ok = g && gm::loadWorld(world, rdFile, &g); if (g) g.close(); }
-  Serial.printf("LOAD %s level %d score %d\n", ok ? "ok" : "failed", world.level, world.score);
+  Serial.printf("LOAD slot %d %s level %d score %ld\n", slot + 1, ok ? "ok" : "failed", world.level, (long)world.score);
   if (!ok) { message("Could not load"); delay(1500); enterPicker(); return; }
   world.buildDrawList();
   refreshPalette();

@@ -38,13 +38,13 @@ inline const char* pauseItem(int i) {
   static const char* const names[PA_COUNT] = {"Resume", "Save game", "Load game", "Restart level", "Restart game", "How to play", "Settings", "Quit to library"};
   return names[i];
 }
-// Restart level and Restart game always need a second tap. With the Settings option Confirm Quit (on by default) so do Quit to
-// library, Load game (it replaces the game in play) and Save game when a saved game is already there (it is written over). The first
+// Restart level and Restart game always need a second tap. With the Settings option Confirm Quit (on by default) so does Quit to
+// library. Save game and Load game open the ten-slot list (saveslots.h), which asks before it writes over a slot. The first
 // tap arms the button ("Tap again to restart", or "Tap to restart" where the long form does not fit), for 3 seconds or until another
 // button is tapped. Resume and the others act at once.
 constexpr uint32_t PAUSE_ARM_MS = 3000;
 inline bool pauseNeedsConfirm(int i, bool confirmQuit = true, bool saved = false) {
-  return i == PA_RESTART_LEVEL || i == PA_RESTART_GAME || (confirmQuit && (i == PA_QUIT || i == PA_LOAD || (i == PA_SAVE && saved)));
+  return i == PA_RESTART_LEVEL || i == PA_RESTART_GAME || (confirmQuit && i == PA_QUIT);
 }
 enum { ARM_NONE, ARM_ARMED, ARM_ACT };  // what a tap did: nothing, armed a restart, or should do its action
 struct PauseArm {
@@ -73,8 +73,6 @@ inline const char* pauseLabel(int i, bool armed, int colW, float textSize, bool 
   const char *full, *shortForm;
   switch (i) {
     case PA_QUIT: full = "Tap again to quit"; shortForm = "Tap to quit"; break;
-    case PA_SAVE: full = "Tap to overwrite"; shortForm = "Overwrite?"; break;
-    case PA_LOAD: full = "Tap again to load"; shortForm = "Tap to load"; break;
     default: full = "Tap again to restart"; shortForm = "Tap to restart"; break;
   }
   return (int)(strlen(full) * 6 * textSize) + 8 <= colW ? full : shortForm;
