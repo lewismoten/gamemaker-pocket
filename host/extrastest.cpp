@@ -53,6 +53,16 @@ int main(int argc,char** argv) {
   assert(pk::keyboardAction(g.W,-1)==-1&&pk::keyboardAction(g.W,g.W)==-1);
   assert(pk::searchTitleH(g.W)>=36&&pk::searchTitleH(g.W)<=58);
   {auto b=cx::box(g.W);assert(b.y1-b.y0>=(g.W<=320?36:40)&&b.x1-b.x0>=(g.W<=320?40:48)&&b.x1<=g.W-2&&b.y0>=2);}
+  {  // the Close X's hit area is larger than its drawing, reaches the glass edge and the top, and is a press target in Pause
+    auto b=cx::box(g.W);auto h=cx::hitBox(g.W);
+    assert(h.x0<=b.x0&&h.x1==g.W&&h.y0==0&&h.y1>=b.y1&&h.x1-h.x0>=(g.W<=320?40:48)+2&&h.y1-h.y0>=(g.W<=320?36:40)+2);
+    if(g.W>320)assert(h.x1-h.x0>=50&&h.y1-h.y0>=50);
+    assert(cx::hit(g.W,g.W-1,0)&&cx::hit(g.W,g.W-1,b.y1-1)&&cx::hit(g.W,b.x0,b.y0)&&!cx::hit(g.W,h.x0-1,5)&&!cx::hit(g.W,b.x0,h.y1)&&!cx::hit(g.W,g.W-5,h.y1));
+    prs::Ctx pc{};pc.W=g.W;pc.H=g.H;pc.screen=prs::SC_PAUSE;prs::Rect pr;
+    assert(prs::under(pc,g.W-1,3,pr)&&pr.x1==g.W);
+    int bx0,by0,bx1,by1;
+    for(int i=0;i<ovl::PA_COUNT;i++){ovl::pauseCell(i,bx0,by0,bx1,by1);assert(!cx::hit(g.W,bx0,by0)&&!cx::hit(g.W,bx1-1,by0));}  // no pause button loses a tap to it
+  }
   // The isolated failure action gains slop without changing its drawing.
   auto fail=pk::failButton(g.W,g.H);
   assert(pk::inFailButton(g.W,g.H,fail.x,fail.y-4));

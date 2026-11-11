@@ -38,7 +38,7 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
       if (y < pk::header(W)) {
         if (pk::hitSettings(W, x)) r = {pk::gearX0(W), 0, pk::gearX0(W) + 40, pk::header(W)};
         else if (pk::hitSearch(W, x)) r = {pk::searchX0(W), 0, pk::searchX0(W) + 40, pk::header(W)};
-        else if (pk::hitClose(W, x) && c.back) r = {cx::box(W).x0, 0, cx::box(W).x1, pk::header(W)};
+        else if (pk::hitClose(W, x) && c.back) r = {cx::hitBox(W).x0, 0, cx::hitBox(W).x1, pk::header(W)};
         else return false;
       } else if (y >= f) {
         if (x < 54 && c.prev) r = {0, f, 54, H};
@@ -56,7 +56,7 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
       return r.has(x, y);
     }
     case SC_DETAILS: {  // the Close X, Title, Story, Instructions (picker_draw.h detailsPages), then Favorite, Play (detailsFooter)
-      if (y < pk::header(W)) { r = {cx::box(W).x0, 0, cx::box(W).x1, pk::header(W)}; return pk::hitClose(W, x) && cx::hit(W, x, y); }
+      if (y < pk::header(W)) { r = {cx::hitBox(W).x0, 0, cx::hitBox(W).x1, pk::header(W)}; return pk::hitClose(W, x) && cx::hit(W, x, y); }
       int k = pk::detailsPageAt(W, H, c.pages, x, y), x0, x1;
       if (k >= 0 && pk::detailsPageSpan(W, c.pages, k, x0, x1)) {
         r = {x0, pk::detailsPagesTop(H), x1, pk::detailsPagesBottom(H)};
@@ -80,6 +80,7 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
       return true;
     }
     case SC_PAUSE: {
+      if (cx::hit(W, x, y)) { r = {cx::hitBox(W).x0, 0, cx::hitBox(W).x1, cx::hitBox(W).y1}; return true; }  // the Close X
       int i = ovl::pauseHit(x, y);
       if (i < 0) return false;
       ovl::pauseCell(i, r.x0, r.y0, r.x1, r.y1);
@@ -137,6 +138,7 @@ struct Press {
 };
 // The pause menu's pressed look: the whole button yellow with its label in black (the same button, drawn hot).
 template <class G> void drawPausePressed(G& g, int i, int armed = -1) {
+  if (i < 0) return;  // the Close X: no button to draw hot
   int x0, y0, x1, y1;
   ovl::pauseCell(i, x0, y0, x1, y1);
   ovl::button(g, x0, y0, x1, y1, ovl::pauseLabel(i, i == armed, ovl::PAUSE.colW, ovl::PAUSE.textSize), true, ovl::C_DARK, ovl::PAUSE.textSize);

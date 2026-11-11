@@ -11,8 +11,11 @@ inline int heightFor(int W) { return W <= 320 ? 36 : 40; }
 inline int widthFor(int W) { return W <= 320 ? 40 : 48; }
 inline int bandH(int W) { return INSET + heightFor(W); }  // a header that holds the X is at least this tall
 inline Rect box(int W) { return {W - INSET - widthFor(W), INSET, W - INSET, INSET + heightFor(W)}; }
-// The hit area takes the few pixels above the glass inset too, so a tap at the very top edge still lands.
-inline bool hit(int W, int x, int y) { Rect b = box(W); return x >= b.x0 && x < b.x1 && y >= 0 && y < b.y1; }
+// The hit area is larger than the drawing. It runs to the glass edge on the right and to the top (a capacitive panel reports a
+// touch near its edge a few pixels inward, and the first sample of a landing finger is the least exact), and on the 3.5 inch board
+// it also reaches 8 px down (50 x 50 in all; the gutter to the gear on its left stays inert); the 2.8 inch board keeps its size down, where Pause's buttons are close.
+inline Rect hitBox(int W) { Rect b = box(W); bool big = W > 320; return {b.x0, 0, W, b.y1 + (big ? 8 : 0)}; }
+inline bool hit(int W, int x, int y) { return hitBox(W).has(x, y); }
 template <class G> void draw(G& g, int W) {
   Rect b = box(W);
   int w = b.x1 - b.x0, h = b.y1 - b.y0;

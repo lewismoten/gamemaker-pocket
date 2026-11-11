@@ -291,7 +291,7 @@ template<class G> void drawBadge(G&g,int x,int y) {
 // Header, right to left: the Close X (closex.h; drawn only below the root page), the gear, the magnifier; 4 px gutters between.
 inline int gearX0(int W) {return cx::box(W).x0-44;}
 inline int searchX0(int W) {return gearX0(W)-44;}
-inline bool hitClose(int W,int x) {return x>=cx::box(W).x0&&x<cx::box(W).x1;}
+inline bool hitClose(int W,int x) {return x>=cx::hitBox(W).x0&&x<cx::hitBox(W).x1;}
 inline bool hitSearch(int W,int x) {return x>=searchX0(W)&&x<searchX0(W)+40;}
 inline bool hitSettings(int W,int x) {return x>=gearX0(W)&&x<gearX0(W)+40;}
 inline int pageArrow(int,int x) {return x<54?-1:(x>=58&&x<114)?1:0;}  // -1 back, 1 next, 0 neither
