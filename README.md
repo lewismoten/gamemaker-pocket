@@ -23,10 +23,12 @@ Install [PlatformIO](https://platformio.org/) (the core is enough), then from th
 pio run -e cyd-2432s028                                                       # build the 2.8 inch firmware
 pio run -e cyd-2432s028 -t upload   --upload-port /dev/cu.usbserial-XXXX      # flash the program
 pio run -e cyd-2432s028 -t uploadfs --upload-port /dev/cu.usbserial-XXXX      # the Starters (data/) into LittleFS, once
-pio run -e esp32-3248s035                                                     # the 3.5 inch board, same steps with its env
+pio run -e esp32-3248s035                                                     # the 3.5 inch board: build,
+pio run -e esp32-3248s035 -t upload   --upload-port /dev/cu.usbserial-XXXX    # flash the program,
+pio run -e esp32-3248s035 -t uploadfs --upload-port /dev/cu.usbserial-XXXX    # and the library image
 ```
 
-Use a USB cable that carries data. If `pio` is not on your PATH it is at `~/.platformio/penv/bin/pio`. Each build bakes in its git hash and date; the serial command `FW` (115200 baud) prints them.
+`/dev/cu.usbserial-XXXX` is a macOS example; `pio device list` shows your board's port on any system. Use a USB cable that carries data. If `pio` is not on your PATH it is at `~/.platformio/penv/bin/pio`. Each build bakes in its git hash and date; the serial command `FW` (115200 baud) prints them.
 
 ## Updating the web flasher
 
@@ -43,7 +45,7 @@ The 106 Starters in `data/` go into LittleFS with `uploadfs`. More games go on a
 - `data/` (`games.txt`, `cards.pak`, `small.pak`, `thumbs.pak`, `library.jsonl`, `font.bin`) is the output of `cd web && npx vite-node scripts/pocketData.ts --out <dir>` in a Game-Maker: Sandbox Edition checkout (`web/scripts/pocketData.ts`, with `pocketArt.ts` for the icons and splash).
 - A card full of games: `npx vite-node scripts/pocketData.ts --gmp /Volumes/POCKET` writes every public non-Starter game that fits, as `.GMP` files, into `/Volumes/POCKET/pocket/`.
 - One game: on that site's game page, Download, Pocket Player (microSD) saves `NAME.GMP`; copy it into `/pocket` on the card.
-- `library.jsonl` (the categories, tabs and title screens the board's library browser shows) is written by the same packer (`web/src/export/pocketLibrary.ts`). The `.GMP` format is in `web/src/export/pocketFile.ts`; the card for gamemaker-os is `web/scripts/gmosCard.ts`. The install page and prebuilt firmware images are in that repository's `web/public/pocket/`.
+- `library.jsonl` (the categories, tabs and title screens the board's library browser shows) is written by the same packer (`web/src/export/pocketLibrary.ts`). The `.GMP` format is in `web/src/export/pocketFile.ts`; the card for gamemaker-os is `web/scripts/gmosCard.ts`. The install page and prebuilt firmware images are in that repository's `web/public/pocket/`; this repository's `docs/` is the copy GitHub Pages serves, and `web/public/pocket/` is the site's copy, so rebuild both when firmware changes.
 
 After changing the packed data format here, repack in Game-Maker: Sandbox Edition and copy `data/` back. Details and field notes: [docs/FIRMWARE.md](docs/FIRMWARE.md) and [host/README.md](host/README.md).
 
