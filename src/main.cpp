@@ -22,6 +22,7 @@
 #include "gmcfg.h"
 #include "serialfs.h"
 #include "screenshot.h"
+#include "logring.h"
 #include "screen.h"
 #include "picker_draw.h"
 #include "splash.h"
@@ -51,6 +52,9 @@ static sg::SoftGfx<LGFX> tft(tftHw);       // what everything draws on: the pict
 static LGFX tft;
 static LGFX& tftHw = tft;
 #endif
+static logs::Ring<> eventLog;
+#define LOG_EVENT(...) eventLog.event((unsigned long)millis(), __VA_ARGS__)
+
 // readRect returns panel-order (big endian) RGB565 with setSwapBytes(false).
 static shot::Transfer screenShot;
 static void pollScreenshot() {
@@ -74,6 +78,10 @@ static void fwBoardLoad() {
 }
 // "FW" prints the build; "ID set X" names the board. Also called by the setup's serial poll. True when the line was one of them.
 static bool fwSerial(const char* buf) {
+  if (!strcmp(buf, "LOGS")) {
+    logs::dump(Serial, eventLog);
+    return true;
+  }
   if (!strcmp(buf, "SHOT")) {
     screenShot.start(Serial, scr::W, scr::H);
     return true;
@@ -324,6 +332,7 @@ static bool mountSD() {
   if (sdUp) return true;
   sdSpi.begin(PIN_SD_SCLK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
   sdUp = SD.begin(PIN_SD_CS, sdSpi, 20000000);
+  LOG_EVENT("card mount %s", sdUp ? "ok" : "failed");
   if (!sdUp) sdSpi.end();
   return sdUp;
 }
@@ -720,11 +729,13 @@ static void saveSettings() {
     pref.end();
   }
   File f = LittleFS.open("/settings.txt", "w");
-  if (!f) return;
+  if (!f) { LOG_EVENT("ERROR settings save: open"); return; }
   // Older firmware reads these lines by their first letters ("pad" ...), so the newer keys share no prefix with the old ones and
   // come last: it skips them, and its own save drops them (the pad goes back to Low and Space to the corner).
-  f.printf("lefty=%d\nstylus=%d\npad=%d\ndead=%d\npalm=%d\ndebug=%d\nsound=%d\nraised=%d\njumpnear=%d\nfloat=%d\narcs=%d\nwedge=%d\n", settings.lefty, settings.stylus, settings.padSize,
+  size_t written = f.printf("lefty=%d\nstylus=%d\npad=%d\ndead=%d\npalm=%d\ndebug=%d\nsound=%d\nraised=%d\njumpnear=%d\nfloat=%d\narcs=%d\nwedge=%d\n", settings.lefty, settings.stylus, settings.padSize,
            settings.dead, settings.palm, settings.debug, settings.sound, settings.raised, settings.jumpNear, settings.floatPad, settings.arcs, settings.wedge);
+  f.flush();
+  LOG_EVENT("%ssettings save bytes=%u", written && !f.getWriteError() ? "" : "ERROR ", (unsigned)written);
 }
 static void loadSettings() {
   settings = ctl::Settings();
@@ -1041,10 +1052,11 @@ static bool resumeValid = false;
 static void resumeLoad() {
   Preferences p;
   resumeValid = false;
-  if (!p.begin("pocket", true)) return;
+  if (!p.begin("pocket", true)) { LOG_EVENT("ERROR resume load: NVS open"); return; }
   resumeValid = p.getBytes("resume", &resumeRec, sizeof resumeRec) == sizeof resumeRec && resumeRec.magic == RESUME_MAGIC &&
                 resumeRec.e.magic == gm::ENTRY_MAGIC && resumeRec.crc == pk::crc32(&resumeRec, offsetof(ResumeRec, crc));
   p.end();
+  LOG_EVENT("resume load %s", resumeValid ? "ok" : "absent or invalid");
 }
 static void resumeSave(const GameEntry& g) {
   memset(&resumeRec, 0, sizeof resumeRec);
@@ -1054,8 +1066,10 @@ static void resumeSave(const GameEntry& g) {
   resumeRec.e = world.entry;
   resumeRec.crc = pk::crc32(&resumeRec, offsetof(ResumeRec, crc));
   Preferences p;
-  if (p.begin("pocket", false)) { p.putBytes("resume", &resumeRec, sizeof resumeRec); p.end(); }
-  resumeValid = true;
+  bool saved = false;
+  if (p.begin("pocket", false)) { saved = p.putBytes("resume", &resumeRec, sizeof resumeRec) == sizeof resumeRec; p.end(); }
+  LOG_EVENT("%sresume save id=%s level=%d", saved ? "" : "ERROR ", g.id, (int)world.entry.level);
+  resumeValid = true;  // the in-RAM Continue point remains usable even if persistence failed
 }
 static void resumeClear() {
   if (!resumeValid) return;
@@ -1439,6 +1453,7 @@ static bool cardPresent() { bool was = sdUp, ok = mountSD(); if (!was) unmountSD
 // files, the card), so the list can load its catalog again. `missing` says a level buffer did not load.
 static bool startFailed(bool missing) {
   failWhy = pk::whyFailed(activeGame.sd, !activeGame.sd || cardPresent(), missing, heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  LOG_EVENT("ERROR game load id=%s why=%d", activeGame.id, (int)failWhy);
   Serial.printf("SG fail %s: why %d free %u largest %u\n", activeGame.id, (int)failWhy, (unsigned)ESP.getFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
   assets.release();
   world.releaseAll();
@@ -1452,6 +1467,7 @@ static void loadStep(int n) { if (loadBarOn) pk::drawLoadingBar(tft, scr::W, scr
 static bool startGame(int g, bool withCards = true, const gm::EntryState* from = nullptr) {
   curGame = g;
   if (games) activeGame = games[g];
+  LOG_EVENT("game open id=%s source=%s load=%s", activeGame.id, activeGame.sd ? "card" : "flash", from ? "resume" : "new");
   assets.release();  // whatever the last game (or a failed start) left; a card must be mounted with the heap at its emptiest
   assets.heroChr[0] = 0;
   clearPrefetched();
@@ -1500,6 +1516,7 @@ static bool startGame(int g, bool withCards = true, const gm::EntryState* from =
   t0 = millis();
   ticksRun = 0;
   mode = PLAYING;
+  LOG_EVENT("game load ok id=%s", activeGame.id);
   return true;
 }
 static void refreshPalette() {
@@ -1512,6 +1529,8 @@ static void refreshPalette() {
 }
 
 static void enterPicker() {
+  if (mode == PLAYING || mode == PAUSED || mode == DONE || mode == HELP_SCREEN)
+    LOG_EVENT("game close id=%s", activeGame.id);
   spk::stop();
   stopCardScan();
   if (!catalog) { assets.release(); world.releaseAll(); loadGameList(); restoreSelection=true; }
@@ -1599,6 +1618,7 @@ static bool launchGame(int g, const gm::EntryState* from = nullptr) {
 // The level the game is entering did not load (a file, the memory, or the card went away): free it and show the card.
 static void levelFailed() {
   failWhy = pk::whyFailed(activeGame.sd, !activeGame.sd || cardPresent(), true, heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  LOG_EVENT("ERROR level load id=%s why=%d", activeGame.id, (int)failWhy);
   Serial.printf("LV fail %s: why %d\n", activeGame.id, (int)failWhy);
   assets.release();
   world.releaseAll();
@@ -1612,6 +1632,7 @@ static void levelFailed() {
 // ---- setup and loop ------------------------------------------------------------------------------
 
 static void message(const char* a, const char* b = nullptr) {
+  LOG_EVENT("notice %s %s", a, b ? b : "");
   tft.fillScreen(C_BLACK);
   tft.setTextColor(C_WHITE, C_BLACK);
   tft.setTextSize(2);
@@ -2146,7 +2167,7 @@ static void pollSerial() {
     if (c == '\n' || c == '\r') {
       buf[n] = 0;
       n = 0;
-      if (!strcmp(buf, "SHOT") || !strcmp(buf, "SHOT ABORT")) {
+      if (!strcmp(buf, "LOGS") || !strcmp(buf, "SHOT") || !strcmp(buf, "SHOT ABORT")) {
         fwSerial(buf);
       } else if (buf[0] == 'S' && isSetupCommand(buf)) {
 #ifdef POCKET_CYD28
@@ -2214,6 +2235,7 @@ static void pollSerial() {
 
 void setup() {
   Serial.begin(115200);
+  LOG_EVENT("boot git=%s env=%s", FW_GIT, FW_ENV);
   Serial.printf("BOOT ms=%lu start\n", (unsigned long)millis());
   fwBoardLoad();
   Serial.printf("FW board=%s git=%s date=%s env=%s built=%s %s\n", boardName, FW_GIT, FW_DATE, FW_ENV, __DATE__, __TIME__);
@@ -2263,10 +2285,24 @@ void setup() {
 #endif
   Serial.println(line);
   if (!LittleFS.begin(false)) {
+    LOG_EVENT("ERROR LittleFS mount failed");
     message("LittleFS mount failed");
-    for (;;) delay(1000);
+    // Keep diagnostics available even when storage prevents boot. Only firmware
+    // commands are accepted here; the game/library state has not been initialized.
+    char command[48];
+    unsigned used = 0;
+    for (;;) {
+      while (Serial.available()) {
+        char c = (char)Serial.read();
+        if (c == '\n' || c == '\r') { command[used] = 0; fwSerial(command); used = 0; }
+        else if (used < sizeof command - 1) command[used++] = c;
+      }
+      delay(10);
+    }
   }
+  LOG_EVENT("LittleFS mount ok");
   loadSettings();
+  LOG_EVENT("settings load complete");
   applyBacklight();  // the saved brightness (the first screens above came up at full)
   statusLed.enabled = ledOn;
   resumeLoad();

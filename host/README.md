@@ -110,3 +110,5 @@ comparison to that cadence must be labeled a host-only diagnostic, not a CYD pas
 The Send games page's code (`docs/pocketdisk.js`) has a Node test with a mock Web Serial port: `node host/pocketdisktest.mjs`. The serial file commands' parser is `host/serialfstest.cpp`, and the play core's count clamps are in `host/coretest.cpp`.
 
 Screen capture framing and PNG writer: `python3 host/screenshottest.py` (stdlib Python and C++17, no hardware). Covers the firmware framer at both board sizes, software rotation, malformed/truncated transfers, and PNG pixels/CRCs.
+
+RAM log ring and LOGS framing: `python3 host/logstest.py` (stdlib Python and C++17, no hardware or sanitizers). Checks complete-line eviction and wraparound, truncation, timestamps, empty/full transfers, corrupt/truncated/malformed framing, and CLI output preservation on failed validation.

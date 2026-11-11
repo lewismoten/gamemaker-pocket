@@ -281,6 +281,46 @@ Display SPI: SCLK 14, MOSI 13, MISO 12, CS 15, DC 2, backlight 27. GT911 (I2C): 
 
 `--dry-run` prints the plan only. It stops if any board's lock folder is taken, never writes to a card and never touches the saved display setup. Ctrl-C ends it cleanly.
 
+## Serial RAM logs
+
+`LOGS` (115200 baud, newline terminated) dumps the recent event log, oldest first.
+Run `python3 scripts/pocketLogs.py /dev/cu.usbserial-XXXX /tmp/pocket.log`.
+The macOS/Linux script uses Python stdlib, leaves DTR/RTS untouched, and writes the
+output only after the entire transfer validates. Close other serial monitors first.
+Decode a saved binary serial transcript with `--input dump.bin OUT.log`.
+
+The ring reserves 3072 bytes plus two indices in static RAM, with no heap allocation
+or flash writes. It evicts whole oldest lines, caps each line at 192 bytes including
+its newline, and marks truncated text with `~`. Embedded CR/LF become spaces. Lines
+start with milliseconds since boot (the usual `millis()` wrap applies). Reset loses
+all logs. Events include boot/build, storage mounts, game open/load/close, settings
+load/save, Continue load/save and game/level/storage failures and notices. This is
+an event log, not a copy of high-volume serial input traces or every serial reply.
+Only the main firmware task writes it; it is not a concurrent logging API.
+
+Framing follows SHOT's CRC-32/ISO-HDLC convention (also Python `binascii.crc32`):
+
+```text
+LOGS BEGIN 1 <total-bytes>\n
+LOGS DATA <byte-offset> <byte-count> <8-hex-chunk-crc>\n
+<exactly byte-count raw bytes>\r\n
+... more DATA packets ...
+LOGS END <total-bytes> <8-hex-whole-crc>\n
+```
+
+Chunks contain at most 64 bytes; offsets are contiguous from zero. The whole CRC
+covers only concatenated payload bytes. An empty ring has BEGIN/END with zero bytes
+and CRC `00000000`, without DATA. Hosts reject unknown versions, oversized totals,
+bad offsets/sizes, delimiter errors, missing bytes and CRC mismatches. Unrelated
+serial lines may occur between packets. Dumping leaves the ring intact and does not
+log the LOGS request itself.
+
+The dump runs synchronously on the main task to keep the ring stable, using a
+64-byte stack buffer rather than a second ring. A full dump occupies roughly half
+a second at 115200, temporarily delaying normal main-loop work; pause play first.
+It never waits for a host acknowledgment. LOGS also works during display setup and
+a fatal LittleFS mount failure. Host checks: `python3 host/logstest.py`.
+
 ## Serial screen capture
 
 `SHOT` (115200 baud, newline terminated) streams RGB565 from display RAM on either
