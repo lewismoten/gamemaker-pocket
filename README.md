@@ -25,7 +25,7 @@ pio run -e cyd-2432s028 -t upload   --upload-port /dev/cu.usbserial-XXXX      # 
 pio run -e cyd-2432s028 -t uploadfs --upload-port /dev/cu.usbserial-XXXX      # the Starters (data/) into LittleFS, once
 pio run -e esp32-3248s035                                                     # the 3.5 inch board: build,
 pio run -e esp32-3248s035 -t upload   --upload-port /dev/cu.usbserial-XXXX    # flash the program,
-pio run -e esp32-3248s035 -t uploadfs --upload-port /dev/cu.usbserial-XXXX    # and the library image
+pio run -e esp32-3248s035 -t uploadfs --upload-port /dev/cu.usbserial-XXXX    # and the data (LittleFS)
 ```
 
 `/dev/cu.usbserial-XXXX` is a macOS example; `pio device list` shows your board's port on any system. Use a USB cable that carries data. If `pio` is not on your PATH it is at `~/.platformio/penv/bin/pio`. Each build bakes in its git hash and date; the serial command `FW` (115200 baud) prints them.
