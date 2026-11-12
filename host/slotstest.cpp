@@ -118,6 +118,21 @@ int main(int argc, char** argv) {
     sp::ellipsize("Short", out, sizeof out, 143, 1);
     assert(!strcmp(out, "Short"));
   }
+  // proportional menu text: 1 font px between letters, narrow i/l, wide W/M, fixed digits, 3 px space, cut inside its room
+  {
+    const sp::InkTable& t = sp::ink();
+    assert(t.w['i' - 32] < t.w['W' - 32] && t.w['l' - 32] < t.w['M' - 32] && t.w['W' - 32] <= 6);
+    assert(sp::pwidth("il", 1) == t.w['i' - 32] + 1 + t.w['l' - 32]);  // ink + exactly 1 px + ink
+    assert(sp::pwidth("il", 2) == (t.w['i' - 32] + 1 + t.w['l' - 32]) * 2);
+    assert(sp::pUnits(' ') == 3 && sp::pUnits('1') == sp::pUnits('8') && sp::pUnits('0') == sp::pUnits('9'));
+    assert(sp::pwidth("Level 1", 1) == sp::pwidth("Level 8", 1));
+    assert(sp::pwidth("illi t1", 2) < 7 * 6 * 2 && sp::pwidth("WM", 1) == 2 * sp::ink().w['W' - 32] + 1);  // tighter than the monospace cell
+    char out[40];
+    sp::pellipsize("A Very Long Game Title Here", out, sizeof out, 100, 1);
+    assert(sp::pwidth(out, 1) <= 100 && !strcmp(out + strlen(out) - 3, "..."));
+    sp::pellipsize("Short", out, sizeof out, 100, 1);
+    assert(!strcmp(out, "Short") && sp::pfit("Short", 4, 1) < 5);
+  }
   // the list draws (one render per state, to look at when a directory is given)
   {
     Canvas g(scr::W, scr::H);
