@@ -6,6 +6,7 @@
 #include "closex.h"
 #include "overlaydraw.h"
 #include "saveslots.h"
+#include "spaced.h"
 
 namespace slotdraw {
 
@@ -16,24 +17,22 @@ template <class G> void row(G& g, int W, int H, const gm::SlotList& l, int i, bo
   uint16_t fill = armed || hot ? ovl::C_YELLOW : ovl::C_DARK, ink = armed || hot ? ovl::C_BLACK : dim ? 0x8410 : ovl::C_WHITE;
   g.fillRoundRect(x0, y0, x1 - x0, y1 - y0, 6, fill);
   g.drawRoundRect(x0, y0, x1 - x0, y1 - y0, 6, dim ? 0x8410 : ovl::C_WHITE);
-  int size = W <= 320 ? 1 : 2, cw = 6 * size;
-  char text[40];
+  int size = W <= 320 ? 1 : 2;
+  char text[40], shown[40];
   const char* label = armed ? "Tap to overwrite" : gm::slotLabel(l, i);
-  snprintf(text, sizeof text, "%d %s", i + 1, label);
-  int room = (x1 - x0 - 12) / cw;
-  if ((int)strlen(text) > room) text[room] = 0;
+  if (armed) snprintf(text, sizeof text, "%s", label);  // the words alone: "Tap to overwrite" is the longest line that has to fit
+  else snprintf(text, sizeof text, "%d %s", i + 1, label);
+  sp::ellipsize(text, shown, sizeof shown, x1 - x0 - 12, size);
   g.setTextSize(size);
   g.setTextColor(ink, fill);
-  g.setCursor(x0 + 8, (y0 + y1) / 2 - 4 * size);
-  g.print(text);
+  sp::print(g, x0 + 8, (y0 + y1) / 2 - 4 * size, shown, size);
 }
 
 template <class G> void screen(G& g, int W, int H, const gm::SlotList& l, bool saving, int armed = -1) {
   g.fillScreen(ovl::C_BLACK);
   g.setTextSize(2);
   g.setTextColor(ovl::C_YELLOW, ovl::C_BLACK);
-  g.setCursor(8, W <= 320 ? 12 : 18);
-  g.print(saving ? "Save game" : "Load game");
+  sp::print(g, 8, W <= 320 ? 12 : 18, saving ? "Save game" : "Load game", 2);
   cx::draw(g, W);
   for (int i = 0; i < gm::SLOTS; i++) row(g, W, H, l, i, saving, i == armed);
 }

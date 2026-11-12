@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "picker.h"
 #include "closex.h"
+#include "spaced.h"
 namespace pk {
 constexpr uint16_t C_WHITE = 0xFFFF, C_BLACK = 0x10A5, C_YELLOW = 0xFEAA, C_GRAY = 0xA5B9, C_DARK = 0x1927;
 // Search keyboard colors: action keys (Space, Del, Done, back, clear) are blue with a yellow frame; vowels are light green.
@@ -12,7 +13,7 @@ template <class G> void drawButton(G& g, int x0, int y0, int x1, int y1, const c
   g.fillRoundRect(x0, y0, x1 - x0, y1 - y0, 6, C_DARK);
   g.drawRoundRect(x0, y0, x1 - x0, y1 - y0, 6, on ? C_WHITE : C_GRAY);
   g.setTextSize(2); g.setTextColor(on ? C_WHITE : C_GRAY, C_DARK);
-  g.setCursor((x0 + x1) / 2 - (int)strlen(label) * 6, (y0 + y1) / 2 - 8); g.print(label);
+  sp::center(g, (x0 + x1) / 2, (y0 + y1) / 2, label, 2);
 }
 // An action key (Space, Del, Done, back, clear): blue with a double yellow frame, so it never reads as a letter.
 template <class G> void drawActionButton(G& g, int x0, int y0, int x1, int y1, const char* label) {
@@ -20,7 +21,7 @@ template <class G> void drawActionButton(G& g, int x0, int y0, int x1, int y1, c
   g.drawRoundRect(x0, y0, x1 - x0, y1 - y0, 6, C_YELLOW);
   g.drawRoundRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2, 5, C_YELLOW);
   g.setTextSize(2); g.setTextColor(C_WHITE, C_ACTION);
-  g.setCursor((x0 + x1) / 2 - (int)strlen(label) * 6, (y0 + y1) / 2 - 8); g.print(label);
+  sp::center(g, (x0 + x1) / 2, (y0 + y1) / 2, label, 2);
 }
 // A letter key whose vowel is tinted (text and frame) so the five vowels stand out.
 template <class G> void drawLetterKey(G& g, int x0, int y0, int x1, int y1, char c) {
@@ -30,7 +31,7 @@ template <class G> void drawLetterKey(G& g, int x0, int y0, int x1, int y1, char
   g.drawRoundRect(x0, y0, x1 - x0, y1 - y0, 6, v ? C_VOWEL : C_WHITE);
   g.setTextSize(2); g.setTextColor(ink, C_DARK);
   char l[2] = {c, 0};
-  g.setCursor((x0 + x1) / 2 - 6, (y0 + y1) / 2 - 8); g.print(l);
+  sp::center(g, (x0 + x1) / 2, (y0 + y1) / 2, l, 2);
 }
 // Icon buttons are 44 pixels wide or larger on both boards.
 template <class G> void drawIcon(G& tft, int slot, int W, int H, int footer) {
@@ -57,14 +58,14 @@ template <class G> void drawIcon(G& tft, int slot, int W, int H, int footer) {
 }
 template <class G> void drawRow(G& tft, const char* text, bool sd, int W, int y, int height) {
     char l[96];
-    pk::ellipsize(text, l, sizeof l, (W - 32 - (sd ? 36 : 0)) / 12);
+    pk::ellipsize(text, l, sizeof l, sp::fit(W - 32 - (sd ? 36 : 0), 2));
     tft.fillRoundRect(6, y, W - 12, height, 6, C_DARK);
     tft.drawRoundRect(6, y, W - 12, height, 6, C_GRAY);
     tft.setTextColor(C_WHITE, C_DARK); tft.setTextSize(2);
-    tft.setCursor(16, y + (height - 16) / 2); tft.print(l);
+    sp::print(tft, 16, y + (height - 16) / 2, l, 2);
     if (sd) {
       tft.setTextColor(C_YELLOW, C_DARK);
-      tft.setCursor(W - 40, y + (height - 16) / 2); tft.print("SD");
+      sp::print(tft, W - 40, y + (height - 16) / 2, "SD", 2);
     }
 }
 // Repaint directly on the dark backing; only an empty slot needs erasing.
@@ -82,14 +83,14 @@ template <class G> void drawSearchText(G& tft, int titleH, const char* text, con
   size_t prefix = 0;
   if (previous && text[0] && previous[0])
     while (text[prefix] && text[prefix] == previous[prefix]) prefix++;
-  int endNew = hintNew ? SEARCH_HINT_SHIFT + (int)strlen(hint) * 12 : (int)strlen(text) * 12 + 2;
-  int endOld = hintOld ? SEARCH_HINT_SHIFT + (int)strlen(hint) * 12 : (int)strlen(previous) * 12 + 2;
+  int endNew = hintNew ? SEARCH_HINT_SHIFT + (int)strlen(hint) * sp::adv(2) : (int)strlen(text) * sp::adv(2) + 2;
+  int endOld = hintOld ? SEARCH_HINT_SHIFT + (int)strlen(hint) * sp::adv(2) : (int)strlen(previous) * sp::adv(2) + 2;
   int end = endNew > endOld ? endNew : endOld;
-  tft.fillRect(8 + prefix * 12, titleH + 4, end - (int)prefix * 12, 16, C_BLACK);
+  tft.fillRect(8 + prefix * sp::adv(2), titleH + 4, end - (int)prefix * sp::adv(2), 16, C_BLACK);
   tft.setTextSize(2);
-  if (hintNew) { tft.setTextColor(C_GRAY, C_BLACK); tft.setCursor(8 + SEARCH_HINT_SHIFT, titleH + 4); tft.print(hint); }
-  else { tft.setTextColor(C_WHITE, C_BLACK); tft.setCursor(8 + prefix * 12, titleH + 4); tft.print(text + prefix); }
-  tft.fillRect(8 + (int)strlen(text) * 12, titleH + 4, 2, 16, C_WHITE);
+  if (hintNew) { tft.setTextColor(C_GRAY, C_BLACK); sp::print(tft, 8 + SEARCH_HINT_SHIFT, titleH + 4, hint, 2); }
+  else { tft.setTextColor(C_WHITE, C_BLACK); sp::print(tft, 8 + prefix * sp::adv(2), titleH + 4, text + prefix, 2); }
+  tft.fillRect(8 + (int)strlen(text) * sp::adv(2), titleH + 4, 2, 16, C_WHITE);
 }
 // The search header is as tall as the Close X band (closex.h: 38 px on the 2.8 in, 42 on the 3.5 in); the query line is under it.
 inline int searchTitleH(int W) { return cx::bandH(W); }
@@ -248,7 +249,7 @@ template<class G> void detailsPages(G&g,int W,int H,int mask) {
   for(int k=0,x0,x1;k<DETAILS_PAGES;k++){if(!detailsPageSpan(W,mask,k,x0,x1))continue;
     g.fillRoundRect(x0,y0,x1-x0,y1-y0,6,C_DARK);g.drawRoundRect(x0,y0,x1-x0,y1-y0,6,C_WHITE);
     const char*l=detailsPageLabel(k);g.setTextSize(scale);g.setTextColor(C_WHITE,C_DARK);
-    g.setCursor((x0+x1)/2-(int)strlen(l)*3*scale,(y0+y1)/2-4*scale);g.print(l);}
+    sp::center(g,(x0+x1)/2,(y0+y1)/2,l,scale);}
 }
 // A line under the title in Details: whether the game is a favorite, or that the list is full.
 template<class G> void detailsNote(G&g,int W,int H,const char*note) {

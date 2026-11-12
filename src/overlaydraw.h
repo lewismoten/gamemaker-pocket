@@ -16,6 +16,7 @@
 #include "gmcfg.h"
 #include "paddraw.h"
 #include "screen.h"
+#include "spaced.h"
 
 namespace ovl {
 constexpr uint16_t C_WHITE = 0xFFFF, C_BLACK = 0, C_YELLOW = 0xFF2A, C_DARK = 0x2104;
@@ -25,10 +26,9 @@ template <class G> void button(G& tft, int x0, int y0, int x1, int y1, const cha
   tft.fillRoundRect(x0, y0, x1 - x0, y1 - y0, 6, hot ? C_YELLOW : fill);
   tft.drawRoundRect(x0, y0, x1 - x0, y1 - y0, 6, C_WHITE);
   tft.setTextColor(hot ? C_BLACK : C_WHITE, hot ? C_YELLOW : fill);
+  while (size > 1 && sp::width((int)strlen(label), size) > x1 - x0 - 8) size = size > 1.5f ? 1.5f : 1;  // a long label steps down a size, never clipped
   tft.setTextSize(size);
-  tft.setTextDatum(textdatum_t::middle_center);
-  tft.drawString(label, (x0 + x1) / 2, (y0 + y1) / 2);
-  tft.setTextDatum(textdatum_t::top_left);
+  sp::center(tft, (x0 + x1) / 2, (y0 + y1) / 2, label, size);
 }
 
 // ---- the pause menu: a title line (the game and its level), then eight buttons in two columns of four ----
@@ -75,7 +75,7 @@ inline const char* pauseLabel(int i, bool armed, int colW, float textSize, bool 
     case PA_QUIT: full = "Tap again to quit"; shortForm = "Tap to quit"; break;
     default: full = "Tap again to restart"; shortForm = "Tap to restart"; break;
   }
-  return (int)(strlen(full) * 6 * textSize) + 8 <= colW ? full : shortForm;
+  return sp::width((int)strlen(full), textSize) + 8 <= colW ? full : shortForm;
 }
 // Button i's rectangle: the left column is play (Resume, Save game, Load game, Restart level), the right the rest.
 inline void pauseCell(int i, int& x0, int& y0, int& x1, int& y1) {
@@ -101,17 +101,15 @@ template <class G> void pauseMenu(G& tft, const char* game, int level, int armed
   char lv[16], name[48];
   snprintf(lv, sizeof lv, "Level %d", level + 1);
   int right = cx::box(scr::W).x0 - 4;  // where "Level n" ends: left of the Close X (it resumes the game)
-  int cw = 6 * p.titleSize, room = (right - p.x0) / cw - (int)strlen(lv) - 2;
+  int cw = sp::adv(p.titleSize), room = (right - p.x0) / cw - (int)strlen(lv) - 2;
   snprintf(name, sizeof name, "%s", game ? game : "");
   if ((int)strlen(name) > room && room > 3) { name[room - 3] = 0; strcat(name, "..."); }
   else if (room <= 3) name[0] = 0;
   tft.setTextSize(p.titleSize);
   tft.setTextColor(C_WHITE, C_BLACK);
-  tft.setCursor(p.x0, p.titleY);
-  tft.print(name);
+  sp::print(tft, p.x0, p.titleY, name, p.titleSize);
   tft.setTextColor(C_YELLOW, C_BLACK);
-  tft.setCursor(right - (int)strlen(lv) * cw, p.titleY);
-  tft.print(lv);
+  sp::print(tft, right - (int)strlen(lv) * cw, p.titleY, lv, p.titleSize);
   cx::draw(tft, scr::W);
   for (int i = 0; i < PA_COUNT; i++) {
     int x0, y0, x1, y1;
@@ -128,8 +126,7 @@ template <class G> void pauseNote(G& tft, const char* msg) {
   tft.fillRect(p.boxX + 1, y, p.boxW - 2, room, C_BLACK);
   tft.setTextSize(size);
   tft.setTextColor(C_YELLOW, C_BLACK);
-  tft.setCursor(p.x0, y + (room - 8 * size) / 2);
-  tft.print(msg);
+  sp::print(tft, p.x0, y + (room - 8 * size) / 2, msg, size);
 }
 
 // ---- How to play: the keys the game lists (its controls.json labels, packed as the .cfg's `key` lines) ----

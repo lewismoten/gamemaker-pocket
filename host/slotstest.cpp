@@ -7,6 +7,7 @@
 namespace textdatum_t { constexpr int middle_center = 4, top_left = 0; }
 #include "canvas.h"
 #include "slotdraw.h"
+#include "spaced.h"
 #include "gmsave.h"
 
 using namespace gm;
@@ -107,6 +108,15 @@ int main(int argc, char** argv) {
       }
     }
     assert(slotAt(W, H, 0, 0) == -1);
+  }
+  // letter spacing: every glyph has a gap after it, and a long label is cut with "..." inside its room, never clipped
+  {
+    char out[40];
+    sp::ellipsize("1 Twenty chars of name", out, sizeof out, 143, 1);
+    assert(strlen(out) == 20 && !strcmp(out + 17, "..."));
+    assert(sp::width((int)strlen(out), 1) <= 143 && sp::adv(1) == 7 && sp::adv(2) == 14);
+    sp::ellipsize("Short", out, sizeof out, 143, 1);
+    assert(!strcmp(out, "Short"));
   }
   // the list draws (one render per state, to look at when a directory is given)
   {

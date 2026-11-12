@@ -1909,8 +1909,7 @@ static bool askName(const char* head, char* name, int max, const uint8_t* bg, bo
   tft.fillRect(0, 0, scr::W, titleH, C_BLACK);
   tft.setTextSize(2);
   tft.setTextColor(pk::C_YELLOW, C_BLACK);
-  tft.setCursor(8, (titleH - 16) / 2);
-  tft.print(head);
+  sp::print(tft, 8, (titleH - 16) / 2, head, 2);
   if (cancelable) cx::draw(tft, scr::W);
   wasDown = true;
   for (;;) {
