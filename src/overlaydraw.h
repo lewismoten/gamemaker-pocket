@@ -26,9 +26,9 @@ template <class G> void button(G& tft, int x0, int y0, int x1, int y1, const cha
   tft.fillRoundRect(x0, y0, x1 - x0, y1 - y0, 6, hot ? C_YELLOW : fill);
   tft.drawRoundRect(x0, y0, x1 - x0, y1 - y0, 6, C_WHITE);
   tft.setTextColor(hot ? C_BLACK : C_WHITE, hot ? C_YELLOW : fill);
-  while (size > 1 && sp::width((int)strlen(label), size) > x1 - x0 - 8) size = size > 1.5f ? 1.5f : 1;  // a long label steps down a size, never clipped
+  while (size > 1 && sp::btnWidth((int)strlen(label), size) > x1 - x0 - 8) size = size > 1.5f ? 1.5f : 1;  // a long label steps down a size, never clipped
   tft.setTextSize(size);
-  sp::center(tft, (x0 + x1) / 2, (y0 + y1) / 2, label, size);
+  sp::centerBtn(tft, (x0 + x1) / 2, (y0 + y1) / 2, label, size);
 }
 
 // ---- the pause menu: a title line (the game and its level), then eight buttons in two columns of four ----
@@ -75,7 +75,7 @@ inline const char* pauseLabel(int i, bool armed, int colW, float textSize, bool 
     case PA_QUIT: full = "Tap again to quit"; shortForm = "Tap to quit"; break;
     default: full = "Tap again to restart"; shortForm = "Tap to restart"; break;
   }
-  return sp::width((int)strlen(full), textSize) + 8 <= colW ? full : shortForm;
+  return sp::btnWidth((int)strlen(full), textSize) + 8 <= colW ? full : shortForm;
 }
 // Button i's rectangle: the left column is play (Resume, Save game, Load game, Restart level), the right the rest.
 inline void pauseCell(int i, int& x0, int& y0, int& x1, int& y1) {

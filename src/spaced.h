@@ -8,17 +8,24 @@ namespace sp {
 inline int gap(float size) { return size >= 2 ? 2 : 1; }
 inline int adv(float size) { return (int)(6 * size + 0.5f) + gap(size); }  // one glyph's step, gap included
 inline int width(int n, float size) { return n * adv(size) - (n ? gap(size) : 0); }  // n glyphs, ink only
+// Button labels are tighter: no extra gap (the font has its own blank column) (the keyboard, slot list and search keep gap()).
+constexpr int BTN_GAP = 0;
+inline int btnWidth(int n, float size) { return n * ((int)(6 * size + 0.5f) + BTN_GAP) - (n ? BTN_GAP : 0); }
 inline int fit(int room, float size) { return room > 0 ? (room + gap(size)) / adv(size) : 0; }  // glyphs that fit in `room` px
 
 // The text with its top left at x, y (the caller has set size and colors).
-template <class G> void print(G& g, int x, int y, const char* s, float size) {
-  for (; *s; s++, x += adv(size)) {
+template <class G> void print(G& g, int x, int y, const char* s, float size, int gp = -1) {
+  int step = gp < 0 ? adv(size) : (int)(6 * size + 0.5f) + gp;
+  for (; *s; s++, x += step) {
     char c[2] = {*s, 0};
     g.setCursor(x, y);
     g.print(c);
   }
 }
 // The text centered on cx, cy.
+template <class G> void centerBtn(G& g, int cx, int cy, const char* s, float size) {
+  print(g, cx - btnWidth((int)strlen(s), size) / 2, cy - (int)(8 * size + 0.5f) / 2, s, size, BTN_GAP);
+}
 template <class G> void center(G& g, int cx, int cy, const char* s, float size) {
   print(g, cx - width((int)strlen(s), size) / 2, cy - (int)(8 * size + 0.5f) / 2, s, size);
 }
