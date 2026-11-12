@@ -9,7 +9,8 @@
 struct Phys {  // the glass: 240 x 320 (W, H), or 320 x 240 for the wide way (sf::WIDE), stored as it is seen
   uint16_t px[480 * 320];
   int W = 240, H = 320;
-  int tc = 0xFFFF, bgc = 0, ts = 1, cx = 0, cy = 0;
+  int tc = 0xFFFF, bgc = 0, cx = 0, cy = 0;
+  float ts = 1;
   bool hasBg = false;
   int fx = 0, fy = 0;   // MADCTL mirror bits
   int clipped = 0;      // writes of a non-black pixel outside the panel
@@ -48,16 +49,20 @@ struct Phys {  // the glass: 240 x 320 (W, H), or 320 x 240 for the wide way (sf
     }
   }
   void pushImage(int x, int y, int w, int h, const uint16_t* d) { for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) set(x + i, y + j, d[j * w + i]); }
-  void setTextSize(int s) { ts = s; }
+  void setTextSize(float s) { ts = s; }
   void setTextColor(uint16_t f) { tc = f; hasBg = false; }
   void setTextColor(uint16_t f, uint16_t g) { tc = f; bgc = g; hasBg = true; }
   void setCursor(int x, int y) { cx = x; cy = y; }
   void setTextDatum(int) {}
   void drawString(const char*, int, int) {}
-  void print(const char* t) {
-    for (; *t; t++, cx += 6 * ts) {
-      if (hasBg) fillRect(cx, cy, 6 * ts, 8 * ts, (uint16_t)bgc);
-      for (int j = 0; j < 8; j++) for (int i = 0; i < 6; i++) if (sg::glyphOn(*t, i, j)) fillRect(cx + i * ts, cy + j * ts, ts, ts, (uint16_t)tc);
+  void print(const char* t) {  // scaled like the board's font, 1.5 included
+    int cw = (int)(6 * ts + 0.5f);
+    for (; *t; t++, cx += cw) {
+      if (hasBg) fillRect(cx, cy, cw, (int)(8 * ts + 0.5f), (uint16_t)bgc);
+      for (int j = 0; j < 8; j++) for (int i = 0; i < 6; i++) if (sg::glyphOn(*t, i, j)) {
+        int ax = cx + (int)(i * ts), bx = cx + (int)((i + 1) * ts), ay = cy + (int)(j * ts), by = cy + (int)((j + 1) * ts);
+        fillRect(ax, ay, bx > ax ? bx - ax : 1, by > ay ? by - ay : 1, (uint16_t)tc);
+      }
     }
   }
 };

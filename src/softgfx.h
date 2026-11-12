@@ -63,7 +63,8 @@ inline uint16_t swap16(uint16_t v) { return (uint16_t)((v << 8) | (v >> 8)); }
 template <class B> class SoftGfx {
   B& b;
   Xf xf;
-  int cx = 0, cy = 0, ts = 1, datum = 0;
+  int cx = 0, cy = 0, datum = 0;
+  float ts = 1;  // text size; 1.5 is a real size (the pause menu's), never cut to 1
   uint16_t fg = 0xFFFF, bg = 0;
   bool hasBg = false;
   uint16_t* tbuf = nullptr;  // for pushImage in the modes 1 and 2: as big as the biggest band
@@ -99,24 +100,24 @@ template <class B> class SoftGfx {
   }
 
   // ---- text ----
-  void setTextSize(int s) { ts = s; b.setTextSize(s); }
+  void setTextSize(float s) { ts = s; b.setTextSize(s); }
   void setTextColor(uint16_t f) { fg = f; hasBg = false; b.setTextColor(f); }
   void setTextColor(uint16_t f, uint16_t g) { fg = f; bg = g; hasBg = true; b.setTextColor(f, g); }
   void setCursor(int x, int y) { cx = x; cy = y; b.setCursor(x, y); }
   // the base's own datum enum (LovyanGFX's textdatum_t: middle_center is 5); only middle center is told apart
   template <class D> void setTextDatum(D d) { datum = ((int)d == 5) ? 1 : 0; b.setTextDatum(d); }
-  int textWidth(const char* s) const { return (int)strlen(s) * GLYPH_W * ts; }
+  int textWidth(const char* s) const { return (int)(strlen(s) * GLYPH_W * ts); }
   void print(const char* s) {
     if (!xf.mode) { b.print(s); return; }
     for (; *s; s++) {
-      if (*s == '\n') { cx = 0; cy += GLYPH_H * ts; continue; }
+      if (*s == '\n') { cx = 0; cy += (int)(GLYPH_H * ts + 0.5f); continue; }
       glyph(*s, cx, cy);
-      cx += GLYPH_W * ts;
+      cx += (int)(GLYPH_W * ts + 0.5f);  // the same step as the board's font and the host render
     }
   }
   void drawString(const char* s, int x, int y) {
     if (!xf.mode) { b.drawString(s, x, y); return; }
-    int w = textWidth(s), h = GLYPH_H * ts;
+    int w = textWidth(s), h = (int)(GLYPH_H * ts + 0.5f);
     if (datum == 1) { x -= w / 2; y -= h / 2; }
     int sx = cx, sy = cy;
     cx = x; cy = y;
@@ -125,9 +126,12 @@ template <class B> class SoftGfx {
   }
 
  private:
+  // The font pixel under scaled pixel d: the last i with (int)(i * ts) <= d (inverse of the edges below).
+  int fontPx(int d) const { float q = (d + 1) / ts; int i = (int)q; if (i < q) i++; return i - 1; }
   // One glyph at logical (x, y), size ts: an opaque cell with a background color, else only its lit pixels in runs.
+  // A font pixel covers [(int)(i * ts), (int)((i + 1) * ts)): at 1.5 that is 1, 2, 1, 2... px, like the board's font.
   void glyph(char ch, int x, int y) {
-    int cw = GLYPH_W * ts, chh = GLYPH_H * ts;
+    int cw = (int)(GLYPH_W * ts + 0.5f), chh = (int)(GLYPH_H * ts + 0.5f);
     if (ts > MAX_SIZE) return;
     if (hasBg) {
       static uint16_t gb[GLYPH_W * GLYPH_H * MAX_SIZE * MAX_SIZE];
@@ -138,7 +142,7 @@ template <class B> class SoftGfx {
         for (int u = 0; u < pw; u++) {
           int lx, ly;
           xf.inv(px + u, py + v, lx, ly);
-          gb[v * pw + u] = glyphOn(ch, (lx - x) / ts, (ly - y) / ts) ? on : off;
+          gb[v * pw + u] = glyphOn(ch, fontPx(lx - x), fontPx(ly - y)) ? on : off;
         }
       b.pushImage(px, py, pw, ph, gb);
       return;
@@ -149,7 +153,8 @@ template <class B> class SoftGfx {
         if (!glyphOn(ch, gx, gy)) { gx++; continue; }
         int run = 1;
         while (gx + run < GLYPH_W && glyphOn(ch, gx + run, gy)) run++;
-        fillRect(x + gx * ts, y + gy * ts, run * ts, ts, fg);
+        int ax = x + (int)(gx * ts), bx = x + (int)((gx + run) * ts), ay = y + (int)(gy * ts), by = y + (int)((gy + 1) * ts);
+        fillRect(ax, ay, bx > ax ? bx - ax : 1, by > ay ? by - ay : 1, fg);
         gx += run;
       }
     }

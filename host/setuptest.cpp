@@ -8,6 +8,8 @@
 #include "setupflow.h"
 #include "screen.h"
 #include "softgfx.h"
+#include "spaced.h"
+#include "framebuffer.h"
 
 static int fails = 0;
 #define CHECK(c, ...) do { if (!(c)) { fails++; printf("FAIL: " __VA_ARGS__); printf("\n"); } } while (0)
@@ -149,5 +151,36 @@ int main() {
   ds::cardPath(chip, path, sizeof path);
   CHECK(!strcmp(chip, "24A1B2C3D4E5") && !strcmp(path, "/pocket/boards/24A1B2C3D4E5.cfg"), "chip path %s", path);
   printf("setup flow: %d failures\n", fails);
+  // ---- the 2.8 inch board's text: size 1.5 stays 1.5 (SoftGfx once cut it to 1, so every pause label came out thin with wide gaps) ----
+  {
+    static Phys a, b;  // a: drawn straight (mode 0); b: through the quarter turn (mode 1), logical (x, y) -> panel (239 - y, x)
+    sg::SoftGfx<Phys> g0(a), g1(b);
+    g1.setMode(1);
+    const char* label = "Quit to library";
+    for (float sz : {1.5f, 2.f}) {
+      a.clear(); b.clear();
+      for (auto* g : {&g0, &g1}) { g->fillRect(0, 0, 120, 40, 0x2104); g->setTextSize(sz); g->setTextColor(0xFFFF, 0x2104); sp::pprint(*g, 6, 10, label, sz); }
+      int diff = 0, ink = 0;
+      for (int y = 0; y < 40; y++) for (int x = 0; x < 120; x++) {
+        uint16_t pa = a.px[y * a.W + x], pb = b.px[x * b.W + (239 - y)];
+        // (the opaque cells come in the panel's byte order: swapped back here)
+        if (pb == sg::swap16(0xFFFF) || pb == sg::swap16(0x2104)) pb = sg::swap16(pb);
+        if (pa != pb) diff++;
+        if (pa == 0xFFFF) ink++;
+      }
+      CHECK(diff == 0, "size %.1f text through the quarter turn matches the straight draw (%d px differ)", sz, diff);
+      CHECK(ink > 100, "size %.1f text has ink", sz);
+      CHECK(g1.textWidth("Quit") == (int)(4 * 6 * sz), "textWidth keeps the fraction at %.1f", sz);
+    }
+    // a gap of exactly 1 font px (1.5 -> 1 or 2 px) between "i" and "t": no lit column is more than 2 px from its neighbor letter's ink
+    a.clear(); g0.setTextSize(1.5f); g0.setTextColor(0xFFFF); sp::pprint(g0, 6, 10, "Resume", 1.5f);
+    int firstCol = -1, lastCol = -1, widest = 0, run = 0;
+    for (int x = 0; x < 120; x++) {
+      bool lit = false;
+      for (int y = 0; y < 40; y++) if (a.px[y * a.W + x] == 0xFFFF) lit = true;
+      if (lit) { if (firstCol < 0) firstCol = x; lastCol = x; if (run > widest) widest = run; run = 0; } else if (firstCol >= 0) run++;
+    }
+    CHECK(abs(lastCol - firstCol + 1 - sp::pwidth("Resume", 1.5f)) <= 1 && widest <= 2, "Resume at 1.5 is %d px wide (want %d), widest gap %d px", lastCol - firstCol + 1, sp::pwidth("Resume", 1.5f), widest);
+  }
   return fails ? 1 : 0;
 }
