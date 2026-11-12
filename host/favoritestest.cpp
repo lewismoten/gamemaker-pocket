@@ -119,8 +119,8 @@ static void hitTables(int W, int H) {
   c.W = W;
   c.H = H;
   c.screen = prs::SC_DETAILS;
-  for (int b = 0; b < 3; b++) {
-    int x = b * W / 3 + W / 6;
+  for (int b = 1; b < 3; b++) {
+    int x = (b - 1) * W / 2 + W / 4;
     prs::Rect r;
     assert(prs::under(c, x, H - 10, r) && pk::detailsButton(W, x) == b && r.x1 - r.x0 >= 32 && r.y1 - r.y0 >= 32);
     assert(pk::detailsButton(W, r.x0) == b && pk::detailsButton(W, r.x1 - 1) == b);

@@ -1,6 +1,6 @@
 // Mac test and renders for the Settings screen (src/settingsdraw.h, through src/pressrect.h as the board taps it): every tab
 // and page at both hands, the Controls preview lit by a real touch through src/controls.h, and Near pad + Raised.
-// Checks: every button (Back, tabs, chips, More) is at least 32 x 32, on screen, apart from the others and found by the hit
+// Checks: every button (Back, tabs, chips, More) is at least 36 x 36, on screen, apart from the others and found by the hit
 // table; every label fits its button and every row name its column; every row of a tab is on one of its pages.
 //   settingstest [out dir]      build with -lz; add -DPOCKET_CYD28 for the 320 x 240 board. PNGs: settings-<w>-<tab>-p<page>-<hand>.png
 #include <stdio.h>
@@ -69,19 +69,20 @@ int main(int argc, char** argv) {
   const char* wn = scr::SMALL ? "320" : "480";
   int buttons = 0, shots = 0;
   // the bar
-  std::vector<st::Box> bar = {st::backBox()};
+  std::vector<st::Box> bar;  // the tabs left to right, then the Close X at the right end
   for (int t = 0; t < st::T_COUNT; t++) {
     st::Box b = st::tabBox(t);
     if ((int)(strlen(st::tabName(t)) * 6 * st::G.tabSize) > b.x1 - b.x0 - 4) fail(std::string("tab label too wide: ") + st::tabName(t));
     bar.push_back(b);
   }
+  bar.push_back(st::backBox());
   for (size_t i = 0; i < bar.size(); i++) {
     const st::Box& b = bar[i];
-    if (b.x1 - b.x0 < 32 || b.y1 - b.y0 < 32 || b.x0 < 0 || b.x1 > scr::W || b.y1 > st::G.barH) fail("bar button small or off screen");
-    for (size_t j = i + 1; j < bar.size(); j++) if (overlap(b, bar[j])) fail("bar buttons overlap");
+    if (b.x1 - b.x0 < 36 || b.y1 - b.y0 < 36 || b.x0 < 0 || b.x1 > scr::W || b.y1 > st::G.barH) fail("bar button small or off screen");
+    for (size_t j = i + 1; j < bar.size(); j++) if (overlap(b, bar[j]) || (j == i + 1 && bar[j].x0 - b.x1 < 4)) fail("bar buttons need a four-pixel gap");
   }
   for (int t = 0; t < st::T_COUNT; t++) {
-    st::Item all[12];
+    st::Item all[16];
     int n = st::tabItems((st::Tab)t, all), seen = 0;
     for (int page = 0; page < st::pages((st::Tab)t); page++) {
       for (int pause = 0; pause < 2; pause++) {
@@ -95,16 +96,36 @@ int main(int argc, char** argv) {
         ctx.H = scr::H;
         ctx.settings = v;
         std::vector<st::Box> boxes = bar;
-        if (t == st::T_CONTROLS) {
+        if (t == st::T_CONTROLS && st::PREVIEW) {
           st::Box p = st::previewBox();
           if (p.x1 > scr::W || p.y1 > st::G.moreY0) fail("preview off screen or over More");
           prs::Rect r;
           if (prs::under(ctx, (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, r)) fail("the preview counts as a button");
           if (st::hit(v, (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2).kind != st::K_PREVIEW) fail("the preview is not found");
           boxes.push_back(p);
-          if (st::pages(v.tab) > 1) boxes.push_back(st::moreBox());
         }
-        st::Item it[12];
+        if (t == st::T_CONTROLS && !st::PREVIEW) {  // the Preview button opens the Preview page; it is 36 px and apart from More
+          st::Box pb = st::previewBtn();
+          if (pb.x1 - pb.x0 < 36 || pb.y1 - pb.y0 < 36 || pb.y1 > scr::H) fail("Preview button is small or off screen");
+          if (st::hit(v, (pb.x0 + pb.x1) / 2, (pb.y0 + pb.y1) / 2).kind != st::K_PVOPEN) fail("Preview button is not found");
+          if (overlap(pb, st::moreBox())) fail("Preview button overlaps More");
+          boxes.push_back(pb);
+        }
+        if (t == st::T_CONTROLS && st::pages(v.tab) > 1) {
+          st::Box m = st::moreBox();
+          if (m.x1 - m.x0 < 36 || m.y1 - m.y0 < 36 || m.y1 > scr::H) fail("More is small or off screen");
+          st::Box nb = st::nextBox(), pv = st::prevBox();
+          if (nb.x1 - nb.x0 < 36 || pv.x1 - pv.x0 < 36 || nb.y1 - nb.y0 < (scr::SMALL ? 36 : 40)) fail("Prev or Next is small");
+          st::View first = v; first.page = 0;
+          if (st::hit(first, (nb.x0 + nb.x1) / 2, (nb.y0 + nb.y1) / 2).kind != st::K_MORE) fail("Next is not found");
+          if (st::hit(first, (pv.x0 + pv.x1) / 2, (pv.y0 + pv.y1) / 2).kind != st::K_NONE) fail("Prev works on the first page");
+          st::View last = v; last.page = st::pages(v.tab) - 1;
+          if (st::hit(last, (nb.x0 + nb.x1) / 2, (nb.y0 + nb.y1) / 2).kind != st::K_NONE) fail("Next works on the last page");
+          if (st::hit(last, (pv.x0 + pv.x1) / 2, (pv.y0 + pv.y1) / 2).kind != st::K_PREV) fail("Prev is not found");
+          boxes.push_back(pv);
+          boxes.push_back(nb);
+        }
+        st::Item it[16];
         int k = st::pageItems(v, it);
         if (!pause) seen += k;
         for (int i = 0; i < k; i++) {
@@ -115,10 +136,11 @@ int main(int argc, char** argv) {
           int c = st::chipCount(it[i]);
           for (int j = 0; j < c; j++) {
             st::Box b = st::chipBox(rb.chips, c, j);
+            if (j && b.x0 - st::chipBox(rb.chips, c, j-1).x1 < 4) fail("chips need a four-pixel gap");
             char lab[24];
             st::chipLabel(it[i], j, lab, sizeof lab);
             std::string nm = std::string(st::info(it[i]).name) + " / " + lab;
-            if (b.x1 - b.x0 < 32 || b.y1 - b.y0 < 32) fail("chip under 32 x 32: " + nm);
+            if (b.x1 - b.x0 < 36 || b.y1 - b.y0 < 36) fail("chip under 36 x 36: " + nm);
             if (b.x0 < 0 || b.x1 > scr::W || b.y1 > scr::H) fail("chip off screen: " + nm);
             if ((int)strlen(lab) * 6 > b.x1 - b.x0 - 6) fail("chip label does not fit: " + nm);
             prs::Rect r;
@@ -126,6 +148,11 @@ int main(int argc, char** argv) {
             if (prs::under(ctx, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, r) != live) fail("hit table misses " + nm);
             st::Hit h = st::hit(v, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2);
             if (live && (h.kind != st::K_CHIP || h.item != it[i] || h.chip != j)) fail("hit finds the wrong chip for " + nm);
+            if (c == 1) {
+              st::Hit label = st::hit(v, 6, (b.y0+b.y1)/2);
+              if (live ? (label.kind != st::K_CHIP || label.item != it[i] || label.box.x0 != 4) : label.kind != st::K_NONE)
+                fail("single-action row label / paused Rescan hit mismatch");
+            }
             for (auto& o : boxes) if (overlap(o, b)) fail("chip overlaps another button: " + nm);
             boxes.push_back(b);
             buttons++;
@@ -151,6 +178,29 @@ int main(int argc, char** argv) {
     st::View v;
     ctl::Layout L = ctl::makeLayout(vals.s, demoNeed());
     v.last = st::I_DEAD;
+    v.preview = !st::PREVIEW;  // 2.8 inch: the pad is on the Preview page
+    if (!st::PREVIEW) {
+      st::Box p = st::previewBox(), ob = st::optionsBtn();
+      st::View o = v;
+      o.preview = false;
+      if (st::hit(o, (st::previewBtn().x0 + st::previewBtn().x1) / 2, st::previewBtn().y0 + 5).kind != st::K_PVOPEN) fail("Controls has no reachable Preview");
+      if (p.x0 < 0 || p.x1 > scr::W || p.y0 <= st::G.barH || p.y1 > st::G.moreY0 - 20) fail("Preview page: pad off screen or over the buttons");
+      if (ob.x1 - ob.x0 < 36 || ob.y1 - ob.y0 < 36 || ob.y1 > scr::H) fail("Back to options is small or off screen");
+      if (st::hit(v, (ob.x0 + ob.x1) / 2, (ob.y0 + ob.y1) / 2).kind != st::K_PVBACK) fail("Back to options is not found");
+      if (st::hit(v, (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2).kind != st::K_PREVIEW) fail("Preview page: the pad is not found");
+      if (st::pageItems(v, nullptr) != 0) fail("Preview page still lists rows");
+      if (overlap(p, ob) || overlap(p, st::backBox())) fail("Preview page overlaps");
+      Canvas c(scr::W, scr::H);
+      st::Values pv;
+      pv.s.lefty = 1;
+      st::screen(c, v, pv, st::CardInfo(), ctl::makeLayout(pv.s, demoNeed()), demoNeed(), 0, 0, 0);
+      st::View v0 = v;
+      v0.preview = false;
+      Canvas c0(scr::W, scr::H);
+      st::screen(c0, v0, pv, st::CardInfo(), ctl::makeLayout(pv.s, demoNeed()), demoNeed(), 0, 0, 0);
+      if (c.px == c0.px) fail("Preview page draws the same as the options");
+      shot(dir, "settings-320-Controls-preview", v, vals);
+    }
     shot(dir, std::string("settings-") + wn + "-Controls-hint", v, vals);
     Lit lit = touchPreview(vals.s, L.pad.cx + L.pad.r * 45 / 100, L.pad.cy - L.pad.r * 45 / 100);
     if (!lit.held) fail("a touch on the preview's pad pressed nothing");
@@ -193,13 +243,14 @@ int main(int argc, char** argv) {
     shots += 4;
   }
 #ifdef POCKET_CYD28
-  {  // Settings, Display, Panel, Picture (picturetune.h): chips 32 x 32 or more, apart, found by the hit table; the commands
+  {  // Settings, Display, Panel, Picture (picturetune.h): chips 36 x 36 or more, apart, found by the hit table; the commands
     std::vector<pt::Box> all = {pt::backBox()};
     for (int r = 0; r < 2; r++) for (int k = 0; k < 4; k++) all.push_back(pt::chipBox(r, k));
     for (size_t i = 0; i < all.size(); i++) {
       const pt::Box& b = all[i];
       buttons++;
-      if (b.x1 - b.x0 < 32 || b.y1 - b.y0 < 32) fail("picture: a button under 32 x 32");
+      if (i && (i-1)%4 && b.x0-all[i-1].x1<4) fail("picture: chips need a four-pixel gap");
+      if (b.x1 - b.x0 < 36 || b.y1 - b.y0 < 36) fail("picture: a button under 36 x 36");
       if (b.x0 < 0 || b.y0 < 0 || b.x1 > scr::W || b.y1 > scr::H) fail("picture: a button off screen");
       for (size_t j = 0; j < i; j++) if (all[j].x0 < b.x1 && b.x0 < all[j].x1 && all[j].y0 < b.y1 && b.y0 < all[j].y1) fail("picture: buttons overlap");
       pt::Hit h = pt::hit((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2);

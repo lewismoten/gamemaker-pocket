@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "overlaydraw.h"
 #include "picker.h"
+#include "picker_draw.h"
 #include "settingsdraw.h"
 namespace prs {
 struct Rect {
@@ -17,6 +18,7 @@ enum Screen : uint8_t { SC_PICKER, SC_DETAILS, SC_DISPLAY, SC_SETTINGS, SC_PAUSE
 struct Ctx {
   Screen screen = SC_PICKER;
   int W = 480, H = 320, titleH = 40;
+  bool emptyCheck = false;
   bool back = true, prev = false, next = false, action = false;  // library: which controls are live
   int tiles = 0;                                                // library: tiles on this page
   st::View settings;     // settings: the tab and page showing
@@ -24,31 +26,27 @@ struct Ctx {
   int pages = 0;        // details: the game's own pages (picker.h detailsPageSpan mask)
 };
 inline Rect tileRect(int W, int i) {
-  bool s = W == 320;
-  Rect r;
-  r.x0 = (s ? 12 : 16) + i % 3 * (s ? 100 : 152);
-  r.y0 = (s ? 36 : 40) + i / 3 * (s ? 84 : 120);
-  r.x1 = r.x0 + (s ? 96 : 144);
-  r.y1 = r.y0 + (s ? 80 : 112);
-  return r;
+  auto t=pk::tile(W,i);
+  return {t.x,t.y,t.x+t.w,t.y+t.h};
 }
 // The button under (x, y), or false. Only live controls count.
 inline bool under(const Ctx& c, int x, int y, Rect& r) {
   const int W = c.W, H = c.H;
   switch (c.screen) {
     case SC_PICKER: {
-      int f = W == 320 ? 208 : 280;
-      if (y < 32) {
-        if (x >= W - 32) r = {W - 32, 0, W, 32};
-        else if (x >= W - 64) r = {W - 64, 0, W - 32, 32};
-        else if (x < 32 && c.back) r = {0, 0, 32, 32};
+      int f = pk::footer(W);
+      if (y < pk::header(W)) {
+        if (pk::hitSettings(W, x)) r = {pk::gearX0(W), 0, pk::gearX0(W) + 40, pk::header(W)};
+        else if (pk::hitSearch(W, x)) r = {pk::searchX0(W), 0, pk::searchX0(W) + 40, pk::header(W)};
+        else if (pk::hitClose(W, x) && c.back) r = {cx::hitBox(W).x0, 0, cx::hitBox(W).x1, pk::header(W)};
         else return false;
       } else if (y >= f) {
-        if (x < 48 && c.prev) r = {0, f, 48, H};
-        else if (x >= 50 && x < 98 && c.next) r = {50, f, 98, H};
+        if (x < 54 && c.prev) r = {0, f, 54, H};
+        else if (x >= 58 && x < 114 && c.next) r = {58, f, 114, H};
         else if (x >= W - 100 && c.action) r = {W - 100, f, W, H};
         else return false;
       } else {
+        if(c.emptyCheck) { int y1=pk::footer(W)-4; r={12,y1-44,W-12,y1};return r.has(x,y); }
         for (int i = 0; i < c.tiles; i++) {
           r = tileRect(W, i);
           if (r.has(x, y)) return true;
@@ -57,15 +55,17 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
       }
       return r.has(x, y);
     }
-    case SC_DETAILS: {  // Title, Story, Instructions (picker_draw.h detailsPages), then Back, Favorite, Play (detailsFooter)
+    case SC_DETAILS: {  // the Close X, Title, Story, Instructions (picker_draw.h detailsPages), then Favorite, Play (detailsFooter)
+      if (y < pk::header(W)) { r = {cx::hitBox(W).x0, 0, cx::hitBox(W).x1, pk::header(W)}; return pk::hitClose(W, x) && cx::hit(W, x, y); }
       int k = pk::detailsPageAt(W, H, c.pages, x, y), x0, x1;
       if (k >= 0 && pk::detailsPageSpan(W, c.pages, k, x0, x1)) {
         r = {x0, pk::detailsPagesTop(H), x1, pk::detailsPagesBottom(H)};
         return true;
       }
     }
-      if (y < H - 38) return false;
-      r = x < W / 3 ? Rect{0, H - 38, W / 3 - 2, H} : x < 2 * W / 3 ? Rect{W / 3, H - 38, 2 * W / 3 - 2, H} : Rect{2 * W / 3, H - 38, W, H};
+      if (y < pk::detailsFooterTop(H)) return false;
+      r = x < W / 2 ? Rect{0, pk::detailsFooterTop(H), W / 2 - 4, H} : Rect{W / 2, pk::detailsFooterTop(H), W, H};
+      if (x >= W / 2 - 4 && x < W / 2) return false;
       return r.has(x, y);
     case SC_DISPLAY:
       if (y >= H - 38) r = {6, H - 38, 100, H - 2};
@@ -80,6 +80,7 @@ inline bool under(const Ctx& c, int x, int y, Rect& r) {
       return true;
     }
     case SC_PAUSE: {
+      if (cx::hit(W, x, y)) { r = {cx::hitBox(W).x0, 0, cx::hitBox(W).x1, cx::hitBox(W).y1}; return true; }  // the Close X
       int i = ovl::pauseHit(x, y);
       if (i < 0) return false;
       ovl::pauseCell(i, r.x0, r.y0, r.x1, r.y1);
@@ -137,7 +138,7 @@ struct Press {
 };
 // The pause menu's pressed look: the whole button yellow with its label in black (the same button, drawn hot).
 template <class G> void drawPausePressed(G& g, int i, int armed = -1) {
-  if (i == ovl::PA_STAR) { ovl::pauseStar(g, false, true); return; }
+  if (i < 0) return;  // the Close X: no button to draw hot
   int x0, y0, x1, y1;
   ovl::pauseCell(i, x0, y0, x1, y1);
   ovl::button(g, x0, y0, x1, y1, ovl::pauseLabel(i, i == armed, ovl::PAUSE.colW, ovl::PAUSE.textSize), true, ovl::C_DARK, ovl::PAUSE.textSize);

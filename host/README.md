@@ -108,3 +108,31 @@ these frame measurements. No board performance budget is defined by this tool. T
 comparison to that cadence must be labeled a host-only diagnostic, not a CYD pass/fail.
 
 The Send games page's code (`docs/pocketdisk.js`) has a Node test with a mock Web Serial port: `node host/pocketdisktest.mjs`. The serial file commands' parser is `host/serialfstest.cpp`, and the play core's count clamps are in `host/coretest.cpp`.
+
+## UI pack usability renders
+
+`extrastest.cpp` uses the firmware's Details, library, empty-state and Settings
+compositions. It checks every pixel of the library tile/header/Check card press
+regions against the drawn geometry, and all combinations of Details page buttons.
+It writes `extras-*.png` at each board's native resolution:
+
+```sh
+mkdir -p /tmp/pocket-extras
+c++ -std=c++17 -O1 -Isrc host/extrastest.cpp -lz -o /tmp/pocket-extras/ui35
+/tmp/pocket-extras/ui35 data /tmp/pocket-extras
+c++ -std=c++17 -O1 -DPOCKET_CYD28 -Isrc host/extrastest.cpp -lz -o /tmp/pocket-extras/ui28
+/tmp/pocket-extras/ui28 data /tmp/pocket-extras
+```
+
+`settingstest.cpp` additionally checks every Settings option, page, touch target,
+label fit, paused Rescan state, and the separate 2.8-inch Preview page. These are
+software renders; finger accuracy and panel appearance still need hardware checks.
+
+`hitshots.cpp` renders the library, Details, each Settings tab, the Search keyboard, the Pause menu and the load-failure dialog and
+outlines every touch rectangle (a color per action) at 2x. Build it against two source trees to compare commits, for example
+`git archive <old> src | tar -x -C /tmp/old`, then `c++ -std=c++17 -O1 -DHIT_BEFORE -I/tmp/old/src -Ihost host/hitshots.cpp -lz -o hb`
+(`HIT_BEFORE` is only for the pre-7a5833a search keyboard) and `./hb out before`; add `-DPOCKET_CYD28` for the 2.8 inch board.
+
+## Saved games, Top Ten, game menu
+
+`slotstest.cpp` checks the ten save slots (listing, names, the overwrite tap, load) and their list layout, `slotstest <dir>` also writes PPM renders. `gamesavetest.cpp` round-trips a save (src/gmsave.h), inserts into the Top Ten (src/gmhiscore.h) and checks the menu's touch map (src/gmmenu.h); `dosmenushots.cpp <data dir> <out dir> ["<title>" <pack base>]` renders the menu, Top Ten and name entry (with a card pack's base, such as `<card>/pocket/b65840cg` from `pocketData.ts --out`, also the game's own menu picture, credits pictures and Top Ten backdrop). Build each with `c++ -std=c++17 -O1 -Isrc host/<file>.cpp -lz` (add `-DPOCKET_CYD28` for 320 x 240).

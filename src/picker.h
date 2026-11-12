@@ -20,6 +20,12 @@ inline void ellipsize(const char* title, char* out, size_t cap, size_t columns) 
   memcpy(out, title, n); out[n] = 0;
   if (strlen(title) > n && n >= 3) memcpy(out + n - 3, "...", 3);
 }
+// Geometry shared by drawing, hit testing and press feedback.
+struct Tile { int x,y,w,h,pw,ph; };
+inline int header(int W) { return W==320?40:44; }
+inline Tile tile(int W,int i) { bool s=W==320;return {(s?12:16)+i%3*(s?100:152),(s?52:60)+i/3*(s?74:108),s?96:144,s?68:100,s?96:144,s?48:72}; }
+inline int footer(int W) { return W==320?202:276; }
+inline int detailsFooterTop(int H) { return H-44; }
 // Details: the game's own pages from its DOS menu (the title, Read Storyline, Read Instructions), one button each above the
 // footer, only for the pages the game has. mask: bit 0 title, 1 story, 2 instructions (the .cfg's `card t`, `card s`, `card h`).
 constexpr int DETAILS_PAGES = 3;
