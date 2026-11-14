@@ -6,6 +6,7 @@ The firmware has no release number of its own. Every build bakes in its git hash
 
 ### Added
 
+- `scripts/release_fw.py` publishes the per-board firmware images and a `pocket-firmware.json` (sha256, size) as GitHub Release assets; the default is a dry run.
 - Games can be kept in the board's flash (LittleFS `/games`) and play like card games, marked On board; a card copy wins over a board copy.
 - The web flasher's Send games tab and the serial `DISK` commands: list, send, remove and reorder the games in the board's flash over USB (`src/serialfs.h`, `docs/send.js`, `docs/pocketdisk.js`).
 - The web flasher's "Player + starter games" install (Virus Blaster, Snowbound, KEEP IT BRIEF!, Sandcastle Knight, Where's the Remote?!), now its default.
