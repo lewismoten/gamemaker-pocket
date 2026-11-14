@@ -32,6 +32,8 @@ Use a USB cable that carries data. If `pio` is not on your PATH it is at `~/.pla
 
 `docs/` is the GitHub Pages site (Settings, Pages, branch `main`, folder `/docs`): an install page where a visitor picks a board and flashes it from Chrome or Edge with the bundled [ESP Web Tools](docs/ewt/THIRD-PARTY.txt). After a firmware or `data/` change, run `scripts/build-pages.sh`. It builds both boards (`pio run`, then `-t buildfs` for the library image), copies bootloader, partitions, firmware and LittleFS images into `docs/fw/<env>/`, and rewrites `docs/manifest-28.json` and `docs/manifest-35.json` with the git hash and date as the version. The page itself (`docs/index.html`, `install.js`) is edited by hand; fonts are in `docs/fonts/`. Commit `docs/`; Pages serves the files as they are. Flash offsets: 0x1000 bootloader, 0x8000 partitions, 0x10000 firmware, 0x110000 LittleFS.
 
+**Release assets:** Game-Maker: Sandbox Edition's site build downloads the images instead of storing them. After `scripts/build-pages.sh`, `scripts/release_fw.py` (a dry run by default; `--build` runs the build first) lists the four images per board with sha256 and size and prints the `gh release create` command; `--publish` runs it. The tag is `fw-<date>-<git>`; `pocket-firmware.json` in the release holds the hashes that the site's `web/scripts/pocketFirmware.json` pins.
+
 ## Getting games onto it
 
 Games can also live in the board's own flash: every `NAME.GMP` in LittleFS `/games` is listed beside the card's (tag: On board; if a game is on both, the card's copy wins). The web flasher's "Player + starter games" image is built by `scripts/build-pages.sh` from five exported games (`GAMEMAKER_DIR`, default `../GameMaker`).
