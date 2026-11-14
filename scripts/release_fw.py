@@ -48,9 +48,14 @@ def main():
     mf = out / "pocket-firmware.json"
     mf.write_text(json.dumps(manifest, indent=2) + "\n")
     for e in files:
+        # gh uses the file's own name as the asset name ("path#text" only sets a label), so both boards'
+        # bootloader.bin would collide: copy each image to its board-prefixed asset name first.
+        staged = out / e["asset"]
+        staged.write_bytes(e["path"].read_bytes())
+        e["path"] = staged
         print(f"{e['asset']:36} {e['size']:>9} {e['sha256']}")
     print(f"manifest: {mf}\ntag: {tag}")
-    cmd = ["gh", "release", "create", tag, str(mf), *[str(e["path"]) + "#" + e["asset"] for e in files],
+    cmd = ["gh", "release", "create", tag, str(mf), *[str(e["path"]) for e in files],
            "--title", f"Pocket Player firmware {tag}",
            "--notes", f"Firmware images for the web flasher, built from {git}. Hashes are in pocket-firmware.json."]
     if not a.publish:
