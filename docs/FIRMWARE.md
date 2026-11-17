@@ -6,7 +6,7 @@ Firmware for two boards: the ESP32-3248S035 (3.5 inch, 480 by 320, ST7796, GT911
 
 The flashed firmware binaries' third-party notices are in [`web/public/pocket/fw/NOTICES.txt`](https://github.com/lewismoten/GameMaker-SandboxEdition/blob/develop/web/public/pocket/fw/NOTICES.txt). Keep that file with the firmware image set when redistributing it.
 
-The play rules are `src/gmcore.h`, a port of the web engine's character, touch, scroll, block-effect and scene code (itself from `code/GM/PLAYGAME.C`) with no board code in it, so the same file runs in the Mac test. Monsters (`src/gmmon.h`, a port of the web engine's `monsters.ts`) are in. **Sound** is queued by the core as events and played by `src/speaker.h` (see Sound below). Not ported: Sound Blaster .VOC clips, FM music, the joystick. The Sandbox games with more than 12 levels or 16 links are left out; the others go on a microSD card (see below) (`npx vite-node scripts/pocketData.ts --list --series any` says why for each).
+The play rules are `src/gmcore.h`, a port of the web engine's character, touch, scroll, block-effect and scene code (itself from `code/GM/PLAYGAME.C`) with no board code in it, so the same file runs in the host test. Monsters (`src/gmmon.h`, a port of the web engine's `monsters.ts`) are in. **Sound** is queued by the core as events and played by `src/speaker.h` (see Sound below). Not ported: Sound Blaster .VOC clips, FM music, the joystick. The Sandbox games with more than 12 levels or 16 links are left out; the others go on a microSD card (see below) (`npx vite-node scripts/pocketData.ts --list --series any` says why for each).
 
 Card drawing (`src/carddraw.h`) clears the full panel to palette 0 between scenes and when a text page uses a different picture, keeps the status-strip margin at palette 0 for pictures and fades, and bounds the final band to the remaining image rows. `host/carddrawtest.cpp`, run at both board sizes by `pocketControlsCheck.ts`, checks a text page after a level, palette byte order and margins. Consecutive text pages on the same packed scene picture (including its palette) restore only the previous text rectangle and draw the new text region; host checks compare these framebuffers byte for byte with full redraws, including MORE and empty pages.
 
@@ -32,8 +32,8 @@ Two of these were identified on 2026-11-05 (printed "ESP32 2432S028" on the back
 Build and flash it (env `cyd-2432s028`; the first board's is `esp32-3248s035`, and each build writes its own folder under `.pio/build/`):
 
 ```sh
-pio run -e cyd-2432s028 -t upload --upload-port /dev/cu.usbserial-XXXX
-pio run -e cyd-2432s028 -t uploadfs --upload-port /dev/cu.usbserial-XXXX   # the Starters, once
+pio run -e cyd-2432s028 -t upload --upload-port <port>
+pio run -e cyd-2432s028 -t uploadfs --upload-port <port>   # the Starters, once
 ```
 
 Everything but the layout is the same program (`-DPOCKET_CYD28` in `platformio.ini` picks the board in `src/board.h`, `src/screen.h`, `src/controls.h` and `src/main.cpp`). The game is drawn at 1x (320 by 200) with a 40 px status strip below it; the controls are drawn over the game at about two thirds of the big board's size, and the list shows four games a page. The first board's play layout is unchanged (`scr::SMALL` is false there). The card, the speaker (GPIO 26) and the RGB LED (a status light; see Pressed buttons below) are as on the first board; the card uses the same pins.
@@ -118,9 +118,9 @@ The board's slot (TF_CS 5, TF_SPI_SCLK 18, TF_SPI_MISO 19, TF_SPI_MOSI 23, from 
 **To try it**
 
 1. Format a card FAT32 (cards over 32 GB come exFAT: use the Disk Utility "MS-DOS (FAT)" format with the MBR scheme, or `diskutil eraseDisk FAT32 POCKET MBR /dev/diskN`; 2 to 32 GB cards are the safe size).
-2. Load the library onto the card: `cd web && npx vite-node scripts/pocketData.ts --gmp /Volumes/POCKET` writes every public game that is not a Starter and passes the packer, one `.GMP` file each, into `/Volumes/POCKET/pocket/` (22 games, about 12 MB on 2026-11-07: ten Sandbox games (Virus Blaster, KEEP IT BRIEF!, Depth Perception, Maximus, Sandcastle Knight, Snowbound, In The Year 2000! and the three Teddy games) and twelve Bizarre games; four more Sandbox games wait on their host checks (`CARD_HOLD` in `pocketData.ts`)). It adds or replaces those files and deletes nothing, so `.GMP` downloads and the boards' saved display setups (`pocket/boards/`) stay. The older loose layout, `--out /Volumes/POCKET` (the same 22 games as about 1,400 shared files, about 16 MB), replaces its own files and also keeps `boards/` and `.GMP` files. Use one layout per card: a game in both is listed once.
+2. Load the library onto the card: `cd web && npx vite-node scripts/pocketData.ts --gmp <card folder>` writes every public game that is not a Starter and passes the packer, one `.GMP` file each, into `<card folder>/pocket/` (for example `/Volumes/POCKET/pocket/` on macOS; 22 games, about 12 MB on 2026-11-07: ten Sandbox games (Virus Blaster, KEEP IT BRIEF!, Depth Perception, Maximus, Sandcastle Knight, Snowbound, In The Year 2000! and the three Teddy games) and twelve Bizarre games; four more Sandbox games wait on their host checks (`CARD_HOLD` in `pocketData.ts`)). It adds or replaces those files and deletes nothing, so `.GMP` downloads and the boards' saved display setups (`pocket/boards/`) stay. The older loose layout, `--out /Volumes/POCKET` (the same 22 games as about 1,400 shared files, about 16 MB), replaces its own files and also keeps `boards/` and `.GMP` files. Use one layout per card: a game in both is listed once.
 3. Put the card in the slot (power off first) and power on. The home page gains Sandbox and Bizarre (categories with no game are left off), and the list shows 128 games with SD on the 22.
-4. No card reader at hand: with a blank FAT32 card in the board and the board on its game list, `~/.platformio/penv/bin/python web/scripts/pocketSdWrite.py /dev/cu.usbserial-XXXX /tmp/pocketcard/pocket` (after `pocketData.ts --gmp /tmp/pocketcard`) writes the files through the USB cable, about 10 KB/s (about 20 minutes a 12 MB library, so a card reader is much quicker), then resets the board.
+4. No card reader at hand: with a blank FAT32 card in the board and the board on its game list, `~/.platformio/penv/bin/python web/scripts/pocketSdWrite.py <port> /tmp/pocketcard/pocket` (after `pocketData.ts --gmp /tmp/pocketcard`) writes the files through the USB cable, about 10 KB/s (about 20 minutes a 12 MB library, so a card reader is much quicker), then resets the board.
 
 **One game, one file (from the site).** On the site, a game's Download button has **Pocket Player (microSD)**: it saves `NAME.GMP` (an 8.3 name from the game's id). To copy it to the card:
 
@@ -128,7 +128,7 @@ The board's slot (TF_CS 5, TF_SPI_SCLK 18, TF_SPI_MISO 19, TF_SPI_MOSI 23, from 
 2. Make a folder named `pocket` at the top of the card if there isn't one, and copy `NAME.GMP` into it. Nothing else to edit: the board lists every `.GMP` in `/pocket`.
 3. Eject the card, put it in the board with the power off, power on. The game is on the list with the SD tag.
 
-Or without a card reader: `pocketSdWrite.py PORT <folder with the .GMP>` as in step 4. From the command line, `npx vite-node scripts/pocketData.ts --gmp /Volumes/POCKET [--only id,id]` writes the same kind of file for the repository's games (it adds or replaces `.GMP` files and deletes nothing). The site's download plays PC speaker sounds only (no Sound Blaster clips or music) and says when a level may be too big for the board's memory.
+Or without a card reader: `pocketSdWrite.py PORT <folder with the .GMP>` as in step 4. From the command line, `npx vite-node scripts/pocketData.ts --gmp <card folder> [--only id,id]` writes the same kind of file for the repository's games (it adds or replaces `.GMP` files and deletes nothing). The site's download plays PC speaker sounds only (no Sound Blaster clips or music) and says when a level may be too big for the board's memory.
 
 A `.GMP` is a bundle in the `small.pak` format (`src/gmsmall.h`, written by `web/src/export/pocketFile.ts`): `game.txt` (`GMP 1`, then `id|title|levels`, then `version <v>` when known), `<id>.cfg`, `cards.pak` (the `.cfg`'s card offsets count from this entry) and the packed files. The firmware lists only format 1, skips a `.GMP` whose id is already listed, and reads the game's files, `.cfg` lines and cards straight from the bundle (`readGameFile`, `cfgOpen`, `readPak` in `main.cpp`). A `.GMP` from `pocketData.ts --gmp` also holds the game's own DOS files as `dos/<NAME>` entries (each its length, then the raw deflate; `--no-dos` leaves them out): the firmware never asks for those names, and Game-Maker OS on the Raspberry Pi plays them, so one card's `/pocket` folder serves both players. With `--gmos` it writes every public game, Starters too; a game the packer leaves out gets a `.GMP` with no `game.txt` (only `library.json` and its DOS files), which the board skips and Game-Maker OS lists. The Mac checks take a `.GMP` as the data folder: `pocketHostCheck.ts <id> --data /path/NAME.GMP` and `pocketCardsCheck.ts <id> --data /path/NAME.GMP` (with `font.bin` beside it).
 
@@ -155,7 +155,7 @@ The board (`src/main.cpp`, `src/gmcards.h`) does all of it except: the title, me
 - Memory: a card takes one 64 KB block on the heap while it shows. The level's big buffers (blocks, hero files, monsters, sounds) are freed first and load again when the next level starts (the first level's intro shows before its files load), because a loaded game fragments the heap below 64 KB (a card that can't be allocated is still skipped). The serial self-test with `cards` frees them the same way.
 - The play loop does not change: `gmcore.h` has a `hold` switch, set by the board, that stops `tick()` at a death or a link (the old level is still there to fade out) until `finish()` enters the next. Without it (the Mac host check, the serial self-test) the tick does both as before, so the tick-for-tick comparison is untouched.
 - Frames: a `card <where> f <table> <seconds> <speed> <frames>` line; the table lists each frame's pak offset and length. The decoder (`fliApply` in `gmcards.h`) handles the FLI chunks COLOR, LC, BLACK, BRUN and COPY, which is all the Starters' animations use; the packer leaves out an animation with any other chunk or size.
-- Check on the Mac: `cd web && npx vite-node scripts/pocketCardsCheck.ts` compares every card and text page of every packed game with what the engine draws on its own `Screen` (pixels, palette, wait seconds).
+- Check on a host computer: `cd web && npx vite-node scripts/pocketCardsCheck.ts` compares every card and text page of every packed game with what the engine draws on its own `Screen` (pixels, palette, wait seconds).
 
 ## Sound
 
@@ -213,14 +213,14 @@ Done writes `firstrun` in NVS (namespace `pocket`) and saves the settings, so th
 
 ## Games, memory and size
 
-106 games, all matching the engine tick for tick on the Mac (list in the host check output), the ones with monsters included. No Sandbox game is packed.
+106 games, all matching the engine tick for tick on a host computer (list in the host check output), the ones with monsters included. No Sandbox game is packed.
 
 - Program: 450 KB of the 1 MB partition. Static RAM: 108 KB of 320 KB (the world now holds 200 monster slots and the monster layer of the map, about 30 KB more); a running game holds the 10 KB map, its blocks (up to 63 KB), the hero files (28 KB), and for a level with monsters the 10 KB monster layer, the monster records and their pictures (the largest level, Take the Wheel, is 114 KB in all).
 - **small.pak** (`src/gmsmall.h`): the Starters' small files (each game's `.cfg`, the shared `.b .m .p .r .c .o .k .s` files) are one LittleFS file, because LittleFS gives each file a 4 KB block: the Starters' separate files overflowed the 752 blocks in the partition; with `small.pak` and `cards.pak` the 106 Starters take 586 blocks (2026-11-06), leaving 166 free (about 5.5 blocks per Starter) (the 1 MB program slot is half full, so the partition table is unchanged). It is `GMS1`, a count, entries sorted by name (name[32], offset, length), then the data; the firmware finds a name by binary search reading flash entry by entry (nothing in RAM) and streams a `.cfg` from it line by line. `cards.pak`, `font.bin` and `games.txt` stay separate files; the microSD card layout is unchanged. The Mac tests read the same `small.pak` with the same code (`host/stdiolines.h`).
 - A level whose hero slots are blank (Choose Your Hero's third level) is written `-` for the hero files in the `.cfg`; the firmware keeps the last hero's files (`heroCbl`, `heroChr` in `gmcfg.h`), as the engine keeps the previous scene's hero.
 - Game data: the 106 games take about 2.3 MB of the 3 MB LittleFS partition (1.6 MB of it the cards in one `cards.pak`, avoiding LittleFS's 4 KB block per separate file). Files are named by content, so the many games that share the hero files and palettes store them once; maps, blocks (cut after the last block the maps use) and hero files are deflated and unpacked with the ROM's miniz.
 
-## Check the play loop on the Mac
+## Check the play loop on a host computer
 
 `cd web && npx vite-node scripts/pocketHostCheck.ts [id ...]` replays each packed game's committed `walkthrough.json` on the engine's headless player, builds `host/hosttest.cpp` (needs `c++` and zlib), replays the same keys through `gmcore.h` on the same packed files, and compares position, sequence and frame, scroll, score, hit points, lives, counters and a hash of the 312 by 196 picture on every tick. One line per game; exit 1 if any differs.
 
@@ -240,19 +240,19 @@ The host check cannot see stack, heap or DRAM limits, so the firmware has a seri
 
 With the board plugged in and on the list (not mid-game, and nobody using it):
 
-`~/.platformio/penv/bin/python web/scripts/pocketBoardCheck.py /dev/cu.usbserial-XXXX --ticks 300`
+`~/.platformio/penv/bin/python web/scripts/pocketBoardCheck.py <port> --ticks 300`
 
 Add `--cards` (serial: `T all 300 cards`) to also load and draw every card of each game with the game loaded, no waiting: a second table (`SC` lines) of cards shown, failed, milliseconds, free heap, largest block and the heap low-water mark, and the lowest of all.
 
 It prints a table and exits 1 on a failed load, a stack high-water under 1024 bytes, or a board that stops answering (a crash shows as a missing `ST done`).
 
-## Colors check (on the Mac)
+## Colors check (on a host computer)
 
 `cd web && npx vite-node scripts/pocketColorCheck.ts out.png` repeats the firmware's color math on First Steps' files, models the panel reading the pushed bytes, and writes the engine's own render, the current firmware and the old one side by side. It exits 1 if a color is off by more than 565 rounding allows. pushImage sends each 16 bit value low byte first and the ST7796 reads it high byte first, so the buffer holds byte-swapped RGB565 (`panel565` in `src/main.cpp`).
 
 ## Rebuild
 
-PlatformIO's core CLI lives in a venv (`~/.platformio/penv`). From the repository root:
+PlatformIO's core CLI lives in a venv (`~/.platformio/penv`; its `python` is in `bin/` on macOS and Linux and in `Scripts\` on Windows). `<port>` is `/dev/cu.usbserial-...` on macOS, `/dev/ttyUSB0` on Linux, `COM3` on Windows. From the repository root:
 
 ```sh
 pio run                 # firmware

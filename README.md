@@ -21,18 +21,18 @@ Install [PlatformIO](https://platformio.org/) (the core is enough), then from th
 
 ```sh
 pio run -e cyd-2432s028                                                       # build the 2.8 inch firmware
-pio run -e cyd-2432s028 -t upload   --upload-port /dev/cu.usbserial-XXXX      # flash the program
-pio run -e cyd-2432s028 -t uploadfs --upload-port /dev/cu.usbserial-XXXX      # the Starters (data/) into LittleFS, once
+pio run -e cyd-2432s028 -t upload   --upload-port <port>      # flash the program
+pio run -e cyd-2432s028 -t uploadfs --upload-port <port>      # the Starters (data/) into LittleFS, once
 pio run -e esp32-3248s035                                                     # the 3.5 inch board, same steps with its env
 ```
 
-Use a USB cable that carries data. If `pio` is not on your PATH it is at `~/.platformio/penv/bin/pio`. Each build bakes in its git hash and date; the serial command `FW` (115200 baud) prints them.
+`<port>` is `/dev/cu.usbserial-...` on macOS, `/dev/ttyUSB0` on Linux and `COM3` on Windows. Use a USB cable that carries data. PlatformIO installs its own `pio` and Python under `~/.platformio/penv` (`bin/` on macOS and Linux, `Scripts\` under `%USERPROFILE%\.platformio\penv` on Windows); if `pio` is not on your PATH, run it from there. Each build bakes in its git hash and date; the serial command `FW` (115200 baud) prints them.
 
 ## Updating the web flasher
 
 `docs/` is the GitHub Pages site (Settings, Pages, branch `main`, folder `/docs`): an install page where a visitor picks a board and flashes it from Chrome or Edge with the bundled [ESP Web Tools](docs/ewt/THIRD-PARTY.txt). After a firmware or `data/` change, run `scripts/build-pages.sh`. It builds both boards (`pio run`, then `-t buildfs` for the library image), copies bootloader, partitions, firmware and LittleFS images into `docs/fw/<env>/`, and rewrites `docs/manifest-28.json` and `docs/manifest-35.json` with the git hash and date as the version. The page itself (`docs/index.html`, `install.js`) is edited by hand; fonts are in `docs/fonts/`. Commit `docs/`; Pages serves the files as they are. Flash offsets: 0x1000 bootloader, 0x8000 partitions, 0x10000 firmware, 0x110000 LittleFS.
 
-**Release assets:** Game-Maker: Sandbox Edition's site build downloads the images instead of storing them. After `scripts/build-pages.sh`, `scripts/release_fw.py` (a dry run by default; `--build` runs the build first) lists the four images per board with sha256 and size and prints the `gh release create` command; `--publish` runs it. The tag is `fw-<date>-<git>`; `pocket-firmware.json` in the release holds the hashes that the site's `web/scripts/pocketFirmware.json` pins.
+**Release assets:** Game-Maker: Sandbox Edition's site build downloads the images instead of storing them. After `scripts/build-pages.sh`, `scripts/release_fw.py` (a dry run by default; `--build` runs the build first) lists the four images per board (bootloader, partitions, firmware, LittleFS) with sha256 and size and prints the `gh release create` command; `--publish` runs that command (needs `gh` logged in). The tag is `fw-<date>-<git>`; `pocket-firmware.json` in the release holds the hashes that the site's `web/scripts/pocketFirmware.json` pins.
 
 ## Getting games onto it
 
@@ -43,7 +43,7 @@ Games can also live in the board's own flash: every `NAME.GMP` in LittleFS `/gam
 The 106 Starters in `data/` go into LittleFS with `uploadfs`. More games go on a FAT32 microSD card, in a `/pocket` folder, one `.GMP` file each. Game packs and the library index are made by Game-Maker: Sandbox Edition, not by this repository:
 
 - `data/` (`games.txt`, `cards.pak`, `small.pak`, `thumbs.pak`, `library.jsonl`, `font.bin`) is the output of `cd web && npx vite-node scripts/pocketData.ts --out <dir>` in a Game-Maker: Sandbox Edition checkout (`web/scripts/pocketData.ts`, with `pocketArt.ts` for the icons and splash).
-- A card full of games: `npx vite-node scripts/pocketData.ts --gmp /Volumes/POCKET` writes every public non-Starter game that fits, as `.GMP` files, into `/Volumes/POCKET/pocket/`.
+- A card full of games: `npx vite-node scripts/pocketData.ts --gmp <card folder>` writes every public non-Starter game that fits, as `.GMP` files, into `<card folder>/pocket/`. The card folder is, for example, `/Volumes/POCKET` on macOS, `/media/<you>/POCKET` on Linux or `E:\` on Windows.
 - One game: on that site's game page, Download, Pocket Player (microSD) saves `NAME.GMP`; copy it into `/pocket` on the card.
 - `library.jsonl` (the categories, tabs and title screens the board's library browser shows) is written by the same packer (`web/src/export/pocketLibrary.ts`). The `.GMP` format is in `web/src/export/pocketFile.ts`; the card for gamemaker-os is `web/scripts/gmosCard.ts`. The install page and prebuilt firmware images are in that repository's `web/public/pocket/`.
 
@@ -51,17 +51,17 @@ After changing the packed data format here, repack in Game-Maker: Sandbox Editio
 
 ## Tools
 
-Python 3 with `pyserial` (PlatformIO's Python has it: `~/.platformio/penv/bin/python`). Run from this folder. Board letters (A, B, C) are set on a board with the serial command `ID set X`.
+Python 3 with `pyserial` (PlatformIO's Python has it, under `~/.platformio/penv`; see above). Run from this folder. Board letters (A, B, C) are set on a board with the serial command `ID set X`.
 
 - `scripts/pocketStatus.py PORT "text"` shows a banner on the board without resetting it (`open_port` is the no-reset port helper the others use); `--find` lists which board is on which port.
 - `scripts/pocketWalk.py --board C scripts/pocket-walks/first-run.txt` plays a script of taps and holds over serial, with expectations and optional camera pictures (the camera step needs a Game-Maker checkout, `GAMEMAKER_DIR`).
 - `scripts/pocketBoardCheck.py`, `pocketHeldTrace.py`: check held input and trace it on a board.
-- `scripts/pocketIconsShot.py OUT game-id`: draws the button icons the firmware picks, on the Mac.
+- `scripts/pocketIconsShot.py OUT game-id`: draws the button icons the firmware picks, on the host computer.
 - `scripts/pocket-heap-test.py`, `pocket-heap-audit.py`, `pocket-inventory-test.py`: heap and inventory checks (the audit also needs a Game-Maker checkout).
 
 ## Host tests
 
-The play loop, cards, controls and setup flow have no board code and are tested on the Mac with a C++17 compiler and zlib: `host/*.cpp` (see [host/README.md](host/README.md); for example `c++ -std=c++17 -O1 -Isrc host/controlstest.cpp -lz && ./a.out`). Some of those tests are run by scripts in Game-Maker: Sandbox Edition that compare them with the real engine.
+The play loop, cards, controls and setup flow have no board code and are tested on a host computer with a C++17 compiler and zlib: `host/*.cpp` (see [host/README.md](host/README.md); for example `c++ -std=c++17 -O1 -Isrc host/controlstest.cpp -lz && ./a.out`). Some of those tests are run by scripts in Game-Maker: Sandbox Edition that compare them with the real engine.
 
 ## License
 

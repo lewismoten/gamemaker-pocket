@@ -5,7 +5,7 @@
 
 It builds host/iconsdump.cpp (which runs the firmware's own icon choice on the game's
 packed data in data) and draws the result at the board's 480 x 320 layout, 2x. The
-text sizes and the wrapping are a Mac approximation of main.cpp (PIL's font, not the board's); the pictures and
+text sizes and the wrapping are a host-computer approximation of main.cpp (PIL's font, not the board's); the pictures and
 their choice are the firmware's own code. Seqs: sequences to give ammo, to see their pictures.
 """
 import math, os, subprocess, sys, tempfile

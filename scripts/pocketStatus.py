@@ -28,7 +28,7 @@ def take_reset_flag():
 def open_port(port, timeout=1, reset=False):
     """Opens a board's serial port WITHOUT the DTR/RTS reset pulse the USB-serial chip gives on a plain open
     (so the board keeps its screen and a banner sent at once is not lost). Do NOT set .dtr/.rts to False before opening:
-    on this Mac's CH340/CP210x drivers that deasserts lines the driver had just asserted and pulses the board (tested
+    with some macOS CH340/CP210x drivers that deasserts lines the driver had just asserted and pulses the board (tested
     2026-11-09: it rebooted; leaving both untouched did not). reset=True pulses the board on purpose
     (EN low through RTS) and waits for the boot."""
     import serial
@@ -76,7 +76,7 @@ def board_id(s):
 
 
 def find_ports():
-    """{name: port} for every USB serial board on this Mac (/dev/cu.usbserial-*; the Pi's usbmodem is left alone), asking each
+    """{name: port} for every USB serial board on this host computer (macOS /dev/cu.usbserial-*; the Pi's usbmodem is left alone), asking each
     one `FW`. A port that doesn't answer is listed under its own name."""
     import glob, serial
     out = {}
