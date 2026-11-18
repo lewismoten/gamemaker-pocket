@@ -149,7 +149,7 @@ static uint8_t* readFileIn(fs::FS& fsys, const char* base, const char* name, siz
     if (smallOpen(pf, pak)) {
       uint8_t* p = nullptr;
       bool found = pak.find(name, &off, &len);
-      if (found) {
+      if (found && len <= 1024 * 1024) {
         p = (uint8_t*)malloc(len + 1);
         if (p && !smallReadAt(&pf, off, p, len)) { free(p); p = nullptr; }
         if (p) *n = len;
@@ -166,9 +166,11 @@ static uint8_t* readFileIn(fs::FS& fsys, const char* base, const char* name, siz
   File f = fsys.open(path, "r");
   if (f) {
     size_t len = f.size();
-    p = (uint8_t*)malloc(len + 1);
-    if (p && f.read(p, len) != len) { free(p); p = nullptr; }
-    if (p) *n = len;
+    if (len <= 1024 * 1024) {
+      p = (uint8_t*)malloc(len + 1);
+      if (p && f.read(p, len) != len) { free(p); p = nullptr; }
+      if (p) *n = len;
+    }
     f.close();
   }
   if (card && !wasUp) unmountSD();
@@ -1890,20 +1892,30 @@ static void diskList() {
   Serial.printf("DISK FREE %lu %lu\n", (unsigned long)(LittleFS.totalBytes() - LittleFS.usedBytes()), (unsigned long)LittleFS.totalBytes());
   Serial.println("DISK END");
 }
+// Only uncommitted serial-transfer scratch files; never remove a published game or order.
+static bool diskCleanupTemps() {
+  bool ok = true;
+  const char* paths[] = {"/games/UPLOAD.TMP", "/games/ORDER.NEW"};
+  for (const char* path : paths) {
+    if (LittleFS.exists(path) && !LittleFS.remove(path)) ok = false;
+  }
+  return ok;
+}
 static void diskPut(const pk::sfs::Cmd& c) {
   char path[32];
   snprintf(path, sizeof path, "/games/%s", c.name);
+  if (!diskCleanupTemps()) { Serial.println("DISK ERR cleanup"); return; }
   if (!pk::sfs::fits(c.size, LittleFS.totalBytes(), LittleFS.usedBytes())) {
     Serial.printf("DISK ERR space %lu\n", (unsigned long)(LittleFS.totalBytes() - LittleFS.usedBytes()));
     return;
   }
   LittleFS.mkdir("/games");
-  LittleFS.remove("/games/UPLOAD.TMP");
   File f = LittleFS.open("/games/UPLOAD.TMP", "w");
   if (!f) { Serial.println("DISK ERR open"); return; }
   Serial.println("DISK GO");
   static uint8_t buf[pk::sfs::CHUNK_MAX];
   uint32_t got = 0, whole = pk::sfs::CRC_START;
+  pk::sfs::CrcFailures crcFailures;
   char line[40];
   while (got < c.size) {
     if (!diskLine(line, sizeof line, 8000)) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR timeout"); return; }
@@ -1919,7 +1931,12 @@ static void diskPut(const pk::sfs::Cmd& c) {
       t = millis();
     }
     if (have < k.size) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR timeout"); return; }
-    if (pk::sfs::crcDone(pk::sfs::crcUpdate(pk::sfs::CRC_START, buf, k.size)) != k.crc) { Serial.println("DISK ERR crc"); continue; }  // the host sends it again
+    if (pk::sfs::crcDone(pk::sfs::crcUpdate(pk::sfs::CRC_START, buf, k.size)) != k.crc) {
+      Serial.println("DISK ERR crc");
+      if (crcFailures.record(false)) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); diskDrain(); return; }
+      continue;  // the host sends it again, within the consecutive failure budget
+    }
+    crcFailures.record(true);
     if (f.write(buf, k.size) != k.size) { f.close(); LittleFS.remove("/games/UPLOAD.TMP"); Serial.println("DISK ERR write"); diskDrain(); return; }
     whole = pk::sfs::crcUpdate(whole, buf, k.size);
     got += k.size;
@@ -2240,6 +2257,7 @@ void setup() {
     message("LittleFS mount failed");
     for (;;) delay(1000);
   }
+  if (!diskCleanupTemps()) Serial.println("DISK ERR cleanup");
   loadSettings();
   applyBacklight();  // the saved brightness (the first screens above came up at full)
   statusLed.enabled = ledOn;
