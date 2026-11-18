@@ -13,7 +13,7 @@ static void check(bool ok, const char* what) { if (!ok) { fails++; printf("FAIL 
 
 int main() {
   auto w = std::make_unique<World>();
-  memset(w.get(), 0, sizeof(World));
+  *w = World{};  // Value-initialize the fixture without byte-clearing a non-trivial World.
   for (int i = 0; i <= BACKBL; i++) w->blkmap[i] = (uint8_t)i;
   w->map[5 * MLEN + 5] = 255;       // a cell above 150
   w->map[7 * MLEN + 3] = 42;
