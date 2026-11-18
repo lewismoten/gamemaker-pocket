@@ -25,6 +25,16 @@ inline uint32_t crcUpdate(uint32_t c, const void* data, size_t n) {
 }
 constexpr uint32_t CRC_START = 0xffffffffu;
 inline uint32_t crcDone(uint32_t c) { return c ^ 0xffffffffu; }
+// Abort on the eighth consecutive bad chunk, not eight failures across an upload.
+// Saturating keeps repeated failures bounded even if a caller records after abort.
+struct CrcFailures {
+  uint8_t consecutive = 0;
+  bool record(bool valid) {
+    if (valid) { consecutive = 0; return false; }
+    if (consecutive < 8) ++consecutive;
+    return consecutive == 8;
+  }
+};
 inline uint32_t roundUp(uint32_t n) { return (n + BLOCK - 1) / BLOCK * BLOCK; }
 // Does a file of `size` bytes fit? Keeps two blocks free for the file system. A file it replaces is not credited: the old copy
 // stays until the new one is whole and renamed over it, so both are on the board for a while.

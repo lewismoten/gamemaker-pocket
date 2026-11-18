@@ -1,7 +1,7 @@
 // The USB file commands' parser, name rules, space check and CRC (src/serialfs.h).
 //   c++ -std=c++17 -Wall -Wextra -I src host/serialfstest.cpp -o /tmp/serialfstest && /tmp/serialfstest
 #include "serialfs.h"
-#include "library.h"
+#include <initializer_list>
 #include <assert.h>
 #include <stdio.h>
 using namespace pk::sfs;
@@ -11,7 +11,8 @@ int main() {
   assert(isOrder("ORDER.TXT") && !isOrder("order.txt") && !isOrder("ORDER.TXT2") && !isOrder("../ORDER.TXT"));
   assert(crcDone(crcUpdate(CRC_START, "123456789", 9)) == 0xCBF43926u);
   uint32_t c = CRC_START; c = crcUpdate(c, "1234", 4); c = crcUpdate(c, "56789", 5); assert(crcDone(c) == 0xCBF43926u);
-  const char data[] = "hello pocket"; assert(crcDone(crcUpdate(CRC_START, data, sizeof data - 1)) == pk::crc32(data, sizeof data - 1));
+  // Independent zlib CRC-32 oracle, without pulling unrelated library/UI code into this test.
+  const char data[] = "hello pocket"; assert(crcDone(crcUpdate(CRC_START, data, sizeof data - 1)) == 0xf1414090u);
   assert(parse("DISK LS").kind == LS && parse("DISK HELLO").kind == HELLO && parse("DISK RESCAN").kind == RESCAN && parse("DISK ABORT").kind == ABORT && parse("DISK END").kind == END);
   Cmd p = parse("DISK PUT BLASTER.GMP 1017234 deadBEEF");
   assert(p.kind == PUT && !strcmp(p.name, "BLASTER.GMP") && p.size == 1017234 && p.crc == 0xdeadbeefu);
@@ -27,6 +28,14 @@ int main() {
   assert(!fits(0, 100, 0) && !fits(FILE_MAX + 1, 100000000, 0));
   assert(fits(4096, 12288, 0) && !fits(4096, 12287 - 4096, 0) && !fits(4096, 8192, 0));
   assert(!fits(10, 100, 500));
+  CrcFailures failures;
+  for (int i = 0; i < 7; ++i) assert(!failures.record(false));
+  assert(!failures.record(true) && failures.consecutive == 0);
+  for (int i = 0; i < 7; ++i) assert(!failures.record(false));
+  assert(failures.record(false) && failures.consecutive == 8);
+  for (int i = 0; i < 512; ++i) assert(failures.record(false) && failures.consecutive == 8);
+  assert(!failures.record(true) && failures.consecutive == 0);
+  for (int i = 0; i < 32; ++i) { assert(!failures.record(false)); assert(!failures.record(true)); }
   // a replacement is checked as if the old copy stays: 100 KB free, a 120 KB file does not fit however big the one it replaces
   assert(!fits(120000, 3000000, 3000000 - 100000));
   assert(parse("DISK ORDER 256").kind == ORDER && parse("DISK ORDER 100").kind == ORDER);

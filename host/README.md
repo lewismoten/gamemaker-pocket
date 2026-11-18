@@ -60,6 +60,37 @@ EOF from an I/O failure, so a configuration truncated after a valid prefix is **
 proven rejected. These probes are not a general malformed-file fuzzer, allocation-failure
 sweep, FAT test, or proof of controller timeout behavior. Test those separately on hardware.
 
+## Board file/upload orchestration (desktop mocks)
+
+```sh
+python3 host/uploadtest.py
+python3 host/uploadtest.py --sanitize
+c++ -std=c++17 -O1 -g -Wall -Wextra -Werror -Isrc host/serialfstest.cpp -o "$TMPDIR/serialfstest"
+"$TMPDIR/serialfstest"
+```
+
+The Python driver inserts the actual `main.cpp` `readFileIn`, `diskPut`, serial
+line/drain and narrow temporary-file cleanup routines into `uploadtest.cpp`, plus
+the verbatim `setup()` mount-through-`loadGameList()` call sequence. It compiles
+with strict warnings, hashes the source/generated harness/binary, and runs the
+binary with a deadline. `uploadtest.cpp` is a fixture template, not a standalone
+host executable. Use `cleanup`, `read` or `crc` to select a single group.
+
+The mocks check orphan removal before actual PUT `usedBytes()`/admission and
+boot listing, both exact temp names, cleanup/mount failure, committed-file
+preservation, actual SmallPak lookup, zero/exact 1 MiB/oversize reads, allocation
+and I/O failure, file closure/card mount ownership, seven bad CRCs then success,
+eight consecutive failures, reset after valid chunks, abort cleanup, and the
+unchanged 8-second inactivity deadline. Boot cleanup failures are logged but do
+not prevent reading committed games; PUT cleanup failures refuse before space
+measurement or truncating a temp. The old game stays until successful rename.
+
+Filesystem, serial, allocator, clock, GMP validation and unrelated boot UI/settings/
+resume boundaries are mocks. These checks do not establish Arduino/LittleFS
+implementation behavior, power-cut atomicity, real allocation fragmentation,
+physical card/USB timing, firmware compilation or hardware acceptance. `readPak`
+is intentionally outside this test/change scope.
+
 ## Every-level software frame profiling
 
 ```sh
